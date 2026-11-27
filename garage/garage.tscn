@@ -1,0 +1,73 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://garage/garage.gd" id="garage"]
+[ext_resource type="Script" path="res://garage/garage_camera.gd" id="cam"]
+[ext_resource type="Texture2D" path="res://assets/garage_grid.png" id="grid_tex"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.22, 0.27, 0.35, 1)
+sky_horizon_color = Color(0.42, 0.46, 0.52, 1)
+ground_bottom_color = Color(0.15, 0.16, 0.18, 1)
+ground_horizon_color = Color(0.42, 0.46, 0.52, 1)
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_energy = 1.2
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="floor_mat"]
+albedo_texture = ExtResource("grid_tex")
+uv1_scale = Vector3(12.5, 12.5, 1)
+roughness = 1.0
+texture_filter = 2
+
+[sub_resource type="PlaneMesh" id="floor_mesh"]
+material = SubResource("floor_mat")
+size = Vector2(25, 25)
+
+[sub_resource type="StandardMaterial3D" id="arrow_mat"]
+albedo_color = Color(1, 0.82, 0.3, 1)
+
+[sub_resource type="PrismMesh" id="arrow_mesh"]
+material = SubResource("arrow_mat")
+size = Vector3(2, 2, 0.05)
+
+[node name="Garage" type="Node3D"]
+script = ExtResource("garage")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-1.0, 0.5, 0)
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.5, 0)
+mesh = SubResource("floor_mesh")
+
+[node name="FrontArrow" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.47, -10.5)
+rotation = Vector3(-1.5708, 0, 0)
+mesh = SubResource("arrow_mesh")
+
+[node name="FrontLabel" type="Label3D" parent="."]
+position = Vector3(0, -0.47, -8.8)
+rotation = Vector3(-1.5708, 0, 0)
+pixel_size = 0.01
+text = "FRONT"
+font_size = 128
+outline_size = 0
+modulate = Color(1, 0.82, 0.3, 1)
+
+[node name="Build" type="Node3D" parent="."]
+
+[node name="Camera" type="Camera3D" parent="."]
+fov = 60.0
+script = ExtResource("cam")

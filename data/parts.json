@@ -1,0 +1,44 @@
+{
+  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). A propeller's steer is how many degrees it swivels when you steer, and air is how much of its push it keeps out of the water (0.2 = a fifth). Add a new part by copying one and changing the numbers.",
+
+  "block": {
+    "name": "Wooden Block",
+    "mass": 50,
+    "buoyancy": 100,
+    "color": "#c8a26b"
+  },
+  "seat": {
+    "name": "Seat",
+    "mass": 30,
+    "buoyancy": 40,
+    "color": "#d94f3d",
+    "seat": {}
+  },
+  "engine": {
+    "name": "Engine",
+    "mass": 80,
+    "buoyancy": 30,
+    "color": "#5a6270",
+    "engine": { "force": 6000, "top_speed": 25 }
+  },
+  "wheel": {
+    "name": "Wheel",
+    "mass": 20,
+    "buoyancy": 30,
+    "color": "#222222",
+    "wheel": { "radius": 0.45, "travel": 0.35, "grip": 1.2 }
+  },
+  "float": {
+    "name": "Float",
+    "mass": 15,
+    "buoyancy": 300,
+    "color": "#f2c230"
+  },
+  "propeller": {
+    "name": "Propeller",
+    "mass": 20,
+    "buoyancy": 10,
+    "color": "#3d8bd9",
+    "thrust": { "force": 2500, "steer": 30, "air": 0.2 }
+  }
+}

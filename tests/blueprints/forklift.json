@@ -1,0 +1,13 @@
+{
+  "name": "Forklift (test)",
+  "parts": [
+    { "part": "block", "pos": [0, 0, 0] }, { "part": "block", "pos": [1, 0, 0] },
+    { "part": "block", "pos": [0, 0, 1] }, { "part": "block", "pos": [1, 0, 1] },
+    { "part": "block", "pos": [0, 0, 2] }, { "part": "block", "pos": [1, 0, 2] },
+    { "part": "seat", "pos": [0, 1, 1] }, { "part": "engine", "pos": [1, 1, 2] },
+    { "part": "wheel", "pos": [-1, 0, 0] }, { "part": "wheel", "pos": [2, 0, 0] },
+    { "part": "wheel", "pos": [-1, 0, 2] }, { "part": "wheel", "pos": [2, 0, 2] },
+    { "part": "block", "pos": [-1, 0, -1] }, { "part": "block", "pos": [2, 0, -1] },
+    { "part": "block", "pos": [-1, 0, -2] }, { "part": "block", "pos": [2, 0, -2] }
+  ]
+}

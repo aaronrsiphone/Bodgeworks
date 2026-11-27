@@ -1,0 +1,7 @@
+# Godot 4 cache and import data (regenerated when the editor opens)
+.godot/
+/android/
+*.tmp
+# OS junk
+.DS_Store
+Thumbs.db

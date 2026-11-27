@@ -1,0 +1,18 @@
+{
+  "_comment": "A blueprint is a list of parts on a grid. pos is [x, y, z] in grid cells (1 cell = 1 metre). Forward is -z, up is +y. rot turns the part in 90 degree steps (0-3).",
+  "name": "Buggy",
+  "parts": [
+    { "part": "block", "pos": [0, 0, 0] },
+    { "part": "block", "pos": [1, 0, 0] },
+    { "part": "block", "pos": [0, 0, 1] },
+    { "part": "block", "pos": [1, 0, 1] },
+    { "part": "block", "pos": [0, 0, 2] },
+    { "part": "block", "pos": [1, 0, 2] },
+    { "part": "seat", "pos": [0, 1, 1] },
+    { "part": "engine", "pos": [1, 1, 2] },
+    { "part": "wheel", "pos": [-1, 0, 0] },
+    { "part": "wheel", "pos": [2, 0, 0] },
+    { "part": "wheel", "pos": [-1, 0, 2] },
+    { "part": "wheel", "pos": [2, 0, 2] }
+  ]
+}
