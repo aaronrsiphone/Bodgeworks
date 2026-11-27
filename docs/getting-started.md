@@ -107,7 +107,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.force` and `engine.top_speed`: how much push the engine gives, and up to what speed.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
-- `thrust.force` and `thrust.steer`: how hard a propeller pushes, and how many degrees it swivels when you steer.
+- `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth).
 
 Try a monster-grip wheel, or a float that makes things fly out of the water.
 

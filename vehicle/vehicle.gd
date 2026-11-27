@@ -154,6 +154,7 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 	if def.has("thrust"):
 		p["thrust"] = float(def.thrust.force)
 		p["swivel"] = deg_to_rad(float(def.thrust.get("steer", 0)))
+		p["air"] = float(def.thrust.get("air", 1.0))
 		thrusters.append(p)
 
 
@@ -181,13 +182,15 @@ func _physics_process(delta: float) -> void:
 	# They swivel when you steer, like an outboard motor. One behind the middle
 	# swivels the opposite way to one in front, so steering always turns the right way.
 	for t in thrusters:
-		var push: float = t.thrust * throttle * (taper if powered else 0.0)
+		var at := to_global(t.pos)
+		# Full push under water, only a fraction ("air" in parts.json) in the air.
+		var grip: float = lerpf(t.air, 1.0, submerged_at(at))
+		var push: float = t.thrust * grip * throttle * (taper if powered else 0.0)
 		var behind: bool = t.pos.z > center_of_mass.z
 		var swivel: float = t.swivel * steer * (-1.0 if behind else 1.0)
 		var aim: Basis = Basis(Vector3.UP, swivel) * t.basis
 		t.root.basis = aim
 		var dir: Vector3 = global_basis * (aim * Vector3.FORWARD)
-		var at := to_global(t.pos)
 		apply_force(dir * push, at - global_position)
 		if t.has("spinner"):
 			t.spinner.rotate_z(throttle * delta * 25.0 if powered else 0.0)
@@ -251,19 +254,26 @@ func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive: float)
 		vis.basis = Basis(Vector3.UP, _steer_angle if w.steers else 0.0) * Basis(Vector3.RIGHT, w.spin)
 
 
-func _apply_water(com_global: Vector3) -> void:
+## How much of a one-cell part at this point is under water: 0 (dry) to 1 (fully under).
+func submerged_at(point: Vector3) -> float:
+	var most := 0.0
 	for water in get_tree().get_nodes_in_group("water"):
-		for p in parts:
-			var at := to_global(p.pos)
-			var depth: float = water.depth_at(at) # how far below the surface the part's middle is
-			var submerged := clampf(depth / CELL + 0.5, 0.0, 1.0)
-			if submerged <= 0.0:
-				continue
-			var lift: float = p.buoyancy * GRAVITY * submerged
-			var point_vel := linear_velocity + angular_velocity.cross(at - com_global)
-			var v := global_basis.inverse() * point_vel # velocity in the vehicle's own directions
-			var drag := global_basis * Vector3(v.x * WATER_DRAG_SIDE, v.y * WATER_DRAG_UP, v.z * WATER_DRAG_FORWARD)
-			apply_force(Vector3.UP * lift - drag * submerged, at - global_position)
+		var depth: float = water.depth_at(point) # how far below the surface the point is
+		most = maxf(most, clampf(depth / CELL + 0.5, 0.0, 1.0))
+	return most
+
+
+func _apply_water(com_global: Vector3) -> void:
+	for p in parts:
+		var at := to_global(p.pos)
+		var submerged := submerged_at(at)
+		if submerged <= 0.0:
+			continue
+		var lift: float = p.buoyancy * GRAVITY * submerged
+		var point_vel := linear_velocity + angular_velocity.cross(at - com_global)
+		var v := global_basis.inverse() * point_vel # velocity in the vehicle's own directions
+		var drag := global_basis * Vector3(v.x * WATER_DRAG_SIDE, v.y * WATER_DRAG_UP, v.z * WATER_DRAG_FORWARD)
+		apply_force(Vector3.UP * lift - drag * submerged, at - global_position)
 
 
 ## Flip the vehicle upright where it is (press R).

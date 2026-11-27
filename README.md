@@ -4,6 +4,15 @@ A father–son hackathon project: a physics sandbox where you bolt parts togethe
 
 **How we work:** get a minimal playable version first, then iterate. The docs below are a starting point, not gospel. Change them when the game teaches us something.
 
+| | |
+|---|---|
+| ![The garage: building a vehicle from parts on a grid](docs/images/garage.jpg) | ![The amphibian swimming across the pond](docs/images/amphibian-swimming.jpg) |
+| **The garage:** snap parts together like Lego | **Floats and propellers:** swim across the pond |
+| ![Pushing the crate in the Special Delivery mission](docs/images/mission-pushing.jpg) | ![Mission complete with a gold medal](docs/images/mission-delivered.jpg) |
+| **Special Delivery:** get the crate to the far side | **Beat the clock:** gold, silver or bronze |
+
+*Screenshots are from Godot's basic Compatibility renderer, so the colours look flatter than they do on a normal graphics card.*
+
 ## Play it
 
 New here? **[Getting started](docs/getting-started.md)** takes you from nothing installed to driving, step by step.
@@ -12,7 +21,7 @@ New here? **[Getting started](docs/getting-started.md)** takes you from nothing 
 - A **garage** where you build vehicles from parts like Lego, then save them and test drive them.
 - A first mission, **Special Delivery**, with gold, silver and bronze times.
 - A test map with a jump ramp, a pond, crates and hills.
-- Wheel suspension, floating, and propellers that steer in water.
+- Wheel suspension, floating, and propellers that steer in water (they push much harder in water than in air).
 - New parts can be added by editing JSON.
 
 **Next up:** see what the playtesters (one dad, one son) ask for.
