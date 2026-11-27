@@ -12,10 +12,15 @@ extends RigidBody3D
 ## thrust turn you and heavy parts tip you.
 
 const CELL := 1.0 # metres per grid cell
+# Physics layers (named in Project Settings > Layer Names > 3D Physics).
+const LAYER_WORLD := 1 # ground, ramps, walls
+const LAYER_PROPS := 2 # crates and cargo
+const LAYER_VEHICLES := 4
 const GRAVITY := 9.8
 const AIR_DRAG := 0.4
 const WATER_DRAG_UP := 300.0 # strong: stops bobbing and bouncing out
-const WATER_DRAG_FLAT := 40.0 # weak: so propellers can push you along
+const WATER_DRAG_FORWARD := 40.0 # weak: so propellers can push you along
+const WATER_DRAG_SIDE := 200.0 # like a keel: you carve turns instead of sliding sideways
 
 # Set these from outside (the player's controls).
 var throttle := 0.0 # -1 reverse .. +1 forward
@@ -40,6 +45,11 @@ var _reset_requested := false
 func build(blueprint: Dictionary) -> void:
 	blueprint_name = blueprint.get("name", "Vehicle")
 	name = blueprint_name
+	collision_layer = LAYER_VEHICLES
+	collision_mask = LAYER_WORLD | LAYER_PROPS | LAYER_VEHICLES
+	# Slippery body: things you push slide along it instead of dragging the nose up.
+	physics_material_override = PhysicsMaterial.new()
+	physics_material_override.friction = 0.2
 
 	var total_mass := 0.0
 	var weighted := Vector3.ZERO
@@ -131,6 +141,7 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 	root.position = p.pos
 	root.basis = p.basis
 	add_child(root)
+	p["root"] = root
 	var spinner := root.get_node_or_null("Spinner")
 	if spinner:
 		p["spinner"] = spinner
@@ -142,6 +153,7 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 		top_speed = max(top_speed, float(def.engine.get("top_speed", 25)))
 	if def.has("thrust"):
 		p["thrust"] = float(def.thrust.force)
+		p["swivel"] = deg_to_rad(float(def.thrust.get("steer", 0)))
 		thrusters.append(p)
 
 
@@ -166,9 +178,15 @@ func _physics_process(delta: float) -> void:
 	_apply_wheels(delta, up, com_global, taper if powered else 0.0)
 
 	# Propellers push along their facing direction, at their position.
+	# They swivel when you steer, like an outboard motor. One behind the middle
+	# swivels the opposite way to one in front, so steering always turns the right way.
 	for t in thrusters:
 		var push: float = t.thrust * throttle * (taper if powered else 0.0)
-		var dir: Vector3 = global_basis * (t.basis * Vector3.FORWARD)
+		var behind: bool = t.pos.z > center_of_mass.z
+		var swivel: float = t.swivel * steer * (-1.0 if behind else 1.0)
+		var aim: Basis = Basis(Vector3.UP, swivel) * t.basis
+		t.root.basis = aim
+		var dir: Vector3 = global_basis * (aim * Vector3.FORWARD)
 		var at := to_global(t.pos)
 		apply_force(dir * push, at - global_position)
 		if t.has("spinner"):
@@ -190,7 +208,7 @@ func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive: float)
 		var from := mount + up * 0.5 # start a bit high so we still hit after a hard landing
 		var reach: float = 0.5 + w.radius + w.travel
 		var query := PhysicsRayQueryParameters3D.create(from, from - up * reach)
-		query.exclude = [get_rid()]
+		query.collision_mask = LAYER_WORLD # wheels ride on the ground, never on crates
 		var hit := space.intersect_ray(query)
 
 		var dist_from_mount: float = w.radius + w.travel
@@ -243,8 +261,8 @@ func _apply_water(com_global: Vector3) -> void:
 				continue
 			var lift: float = p.buoyancy * GRAVITY * submerged
 			var point_vel := linear_velocity + angular_velocity.cross(at - com_global)
-			var v_up := Vector3.UP * point_vel.y
-			var drag := v_up * WATER_DRAG_UP + (point_vel - v_up) * WATER_DRAG_FLAT
+			var v := global_basis.inverse() * point_vel # velocity in the vehicle's own directions
+			var drag := global_basis * Vector3(v.x * WATER_DRAG_SIDE, v.y * WATER_DRAG_UP, v.z * WATER_DRAG_FORWARD)
 			apply_force(Vector3.UP * lift - drag * submerged, at - global_position)
 
 

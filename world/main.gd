@@ -11,14 +11,34 @@ extends Node3D
 @onready var camera: ChaseCamera = $ChaseCamera
 @onready var hud: Label = $HUD/Info
 
+var keys_label: Label
 var vehicle: Vehicle
+var mission: Node # set when playing a mission (see missions/)
 var _entries: Array[Dictionary] = []
 var _index := 0
 
 
 func _ready() -> void:
 	InputSetup.ensure_actions()
-	# Whatever is in the garage comes first, then the starters, then saved vehicles.
+	# Controls hint lives bottom-left so it never collides with mission text at the top.
+	keys_label = hud.duplicate()
+	keys_label.anchor_top = 1.0
+	keys_label.anchor_bottom = 1.0
+	keys_label.offset_top = -70
+	keys_label.offset_bottom = -12
+	keys_label.add_theme_font_size_override("font_size", 15)
+	keys_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	hud.get_parent().add_child(keys_label)
+	if Game.mission_scene != "" and not Game.blueprint.is_empty():
+		# Mission: only your garage build, starting where the mission says.
+		mission = load(Game.mission_scene).instantiate()
+		mission.main = self
+		add_child(mission)
+		spawn.global_transform = mission.start.global_transform
+		_entries.append(Game.blueprint)
+		spawn_vehicle(0)
+		return
+	# Free driving: whatever is in the garage comes first, then the starters, then saved vehicles.
 	if not Game.blueprint.is_empty():
 		_entries.append(Game.blueprint)
 	var paths := blueprints.duplicate()
@@ -55,7 +75,7 @@ func _physics_process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("reset_vehicle"):
 		vehicle.request_reset()
-	elif event.is_action_pressed("next_vehicle"):
+	elif event.is_action_pressed("next_vehicle") and mission == null:
 		spawn_vehicle(_index + 1)
 	elif event.is_action_pressed("garage"):
 		Game.go_to_garage()
@@ -64,5 +84,6 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
 	if vehicle == null:
 		return
-	hud.text = "%s   %d km/h   %d kg\n\nW/S  drive / reverse     A/D  steer     Space  brake\nR  flip upright     Tab  next vehicle     G  back to garage" % [
-		vehicle.blueprint_name, roundi(vehicle.speed_kmh()), roundi(vehicle.mass)]
+	var keys := "R  flip upright     G  back to garage" if mission else "R  flip upright     Tab  next vehicle     G  back to garage"
+	hud.text = "%s   %d km/h   %d kg" % [vehicle.blueprint_name, roundi(vehicle.speed_kmh()), roundi(vehicle.mass)]
+	keys_label.text = "W/S  drive / reverse     A/D  steer     Space  brake\n" + keys

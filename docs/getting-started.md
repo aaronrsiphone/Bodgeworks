@@ -41,6 +41,22 @@ Rules: parts must touch the vehicle, a vehicle can have at most 60 parts, and th
 
 **Save** keeps your vehicle (type a name first). **Load...** brings back a saved vehicle or a starter. Saved vehicles also show up when you press Tab in the test map.
 
+## Missions
+
+The **Missions** list in the garage starts a challenge with the vehicle you've built. Your best time and medal show on the button.
+
+**Special Delivery:** get the orange crate into the green zone on the far side of the pond.
+- The clock starts when you first press the throttle.
+- Medals: **gold** under 0:15, **silver** under 0:25, **bronze** under 1:00.
+- **T** restarts the mission, and **G** takes you back to the garage to improve your design.
+
+Tips (spoilers!):
+- A flat front pushes the crate fine in a straight line, but it slides off as soon as you turn. Build "forks" (blocks sticking forward on both sides) so the crate sits between them.
+- The crate floats. Going straight across the pond is shorter, but your vehicle has to swim and climb out too.
+- Carrying the crate on top is another way to do it.
+
+To make your own delivery mission, duplicate `missions/special_delivery.tscn`, then move its **Start**, **Cargo** and **Goal** nodes in the editor and set the medal times in the Inspector. Add it to the `MISSIONS` list in `game.gd`.
+
 ## Driving controls
 
 | Action | Keyboard | Gamepad |
@@ -51,6 +67,7 @@ Rules: parts must touch the vehicle, a vehicle can have at most 60 parts, and th
 | Flip upright | R | Y |
 | Next vehicle | Tab | Back / View |
 | Back to the garage | G | Start / Menu |
+| Restart mission | T | X |
 
 ## Things to try
 
@@ -79,6 +96,8 @@ Rules the physics enforces:
 - Wheels in front of the middle of the vehicle steer.
 - Heavy parts high up make the vehicle tippy.
 - Propellers push from where they are, so one off to the side will turn you.
+- Propellers swivel when you steer, like an outboard motor. That's how you steer in water.
+- Wheels only grip the ground. They can't climb on crates, so push things with your body or forks.
 
 ## Make a new part (still no code)
 
@@ -88,7 +107,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.force` and `engine.top_speed`: how much push the engine gives, and up to what speed.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
-- `thrust.force`: how hard a propeller pushes.
+- `thrust.force` and `thrust.steer`: how hard a propeller pushes, and how many degrees it swivels when you steer.
 
 Try a monster-grip wheel, or a float that makes things fly out of the water.
 
@@ -106,7 +125,8 @@ vehicle/vehicle.gd     turns a blueprint into a physics body and applies wheel, 
 vehicle/part_catalog.gd  loads and saves the JSON files
 vehicle/part_visuals.gd  what each part looks like (shared by the garage and the test map)
 garage/                the garage editor (garage.gd) and its orbit camera
-game.gd                global state: carries your build between the garage and the test map
+game.gd                global state: your build, the mission list, and the save file (best times)
+missions/              delivery missions, the crate and its floating
 world/test_map.tscn    the test level
 world/main.gd          spawns the vehicle and reads your controls
 world/input_setup.gd   the key and gamepad bindings
@@ -125,7 +145,13 @@ godot --headless --path . --script res://tests/drive_test.gd -- buggy straight
 godot --headless --path . --script res://tests/drive_test.gd -- amphibian ramp
 ```
 
-The scenarios are `straight`, `turn`, `pond` and `ramp`.
+The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates) and `swim` (steer in the pond). Use `forklift` instead of `buggy` to try the test vehicle with forks.
+
+An autopilot can play the delivery mission and report the time:
+
+```
+godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json
+```
 
 The garage test clicks around like a player would, so it needs a window:
 

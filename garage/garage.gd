@@ -261,6 +261,22 @@ func _select(id: String) -> void:
 	_update_ghost()
 
 
+func _start_mission(id: String) -> void:
+	if parts.is_empty():
+		_say("Build something first!")
+		return
+	Game.start_mission(to_blueprint(), id)
+
+
+func _medal_icon(color: Color) -> ImageTexture:
+	var img := Image.create(22, 22, false, Image.FORMAT_RGBA8)
+	for y in 22:
+		for x in 22:
+			if Vector2(x - 10.5, y - 10.5).length() <= 10.0:
+				img.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(img)
+
+
 func _test_drive() -> void:
 	if parts.is_empty():
 		_say("Build something first!")
@@ -364,6 +380,30 @@ func _build_ui() -> void:
 		_changed())
 	var drive := _button(top, "  Test Drive! (G)  ", _test_drive)
 	drive.add_theme_color_override("font_color", Color("#7dff8a"))
+
+	# Right side: missions, with your best medal.
+	var missions := VBoxContainer.new()
+	missions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	missions.anchor_left = 1.0
+	missions.anchor_right = 1.0
+	missions.offset_left = -300
+	missions.offset_right = -16
+	missions.offset_top = 64
+	ui.add_child(missions)
+	var heading := Label.new()
+	heading.text = "Missions"
+	heading.add_theme_font_size_override("font_size", 20)
+	heading.add_theme_constant_override("outline_size", 6)
+	heading.add_theme_color_override("font_outline_color", Color.BLACK)
+	missions.add_child(heading)
+	for m in Game.MISSIONS:
+		var b := _button(missions, m.name, _start_mission.bind(m.id))
+		b.custom_minimum_size.y = 44
+		var best := Game.best(m.id)
+		if not best.is_empty():
+			b.text += "   %s" % Game.format_time(float(best.time))
+			if best.tier != "":
+				b.icon = _medal_icon(Game.TIER_COLORS[best.tier])
 
 	# Bottom: one button per part.
 	var bar := HBoxContainer.new()

@@ -12,6 +12,7 @@ static func ensure_actions() -> void:
 	_action("reset_vehicle", [_key(KEY_R), _button(JOY_BUTTON_Y)])
 	_action("next_vehicle", [_key(KEY_TAB), _button(JOY_BUTTON_BACK)])
 	_action("garage", [_key(KEY_G), _button(JOY_BUTTON_START)])
+	_action("restart_mission", [_key(KEY_T), _button(JOY_BUTTON_X)])
 
 
 static func _action(action: StringName, events: Array) -> void:
