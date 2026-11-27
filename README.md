@@ -8,9 +8,13 @@ A father–son hackathon project: a physics sandbox where you bolt parts togethe
 
 New here? **[Getting started](docs/getting-started.md)** takes you from nothing installed to driving, step by step.
 
-**What works so far:** a test map with a jump ramp, a pond, crates and hills. There are two vehicles built from blueprints (a Buggy and an Amphibian), with wheel suspension, floating and propellers. You can make your own vehicles and parts by editing JSON files.
+**What works so far:**
+- A **garage** where you build vehicles from parts like Lego, then save them and test drive them.
+- A test map with a jump ramp, a pond, crates and hills.
+- Wheel suspension, floating and propellers.
+- New parts can be added by editing JSON.
 
-**Next up:** a garage editor to build vehicles in the game, then a first challenge.
+**Next up:** a first challenge with bronze, silver and gold rewards.
 
 ## Docs
 

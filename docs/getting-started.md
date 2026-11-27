@@ -20,9 +20,28 @@ From nothing to driving in about 15 minutes.
 
 1. Start Godot. In the Project Manager click **Import**, browse to the cloned folder, and pick `project.godot`.
 2. The first time, Godot spends a few seconds importing files. That's normal.
-3. Press **F5** (or the ▶ Play button, top right).
+3. Press **F5** (or the ▶ Play button, top right). You start in the garage. Press **G** to drive.
 
-## Controls
+## The garage
+
+The game starts in the **garage**, with the Buggy ready to change.
+
+| Do this | How |
+|---|---|
+| Pick a part | Click it in the bottom bar, or press 1–6 |
+| Add a part | Left-click. The see-through ghost shows where it goes and snaps onto the face of the part you point at. Red means it can't go there. |
+| Remove a part | Right-click it |
+| Rotate the part | R (useful for propellers, which push away from their blades) |
+| Turn the camera | Right-drag, or Q/E and the arrow keys |
+| Zoom / slide | Scroll wheel / middle-drag |
+| Undo | Ctrl+Z, or the Undo button |
+| Drive it! | G, or the **Test Drive!** button. Press G again to come back. |
+
+Rules: parts must touch the vehicle, a vehicle can have at most 60 parts, and the yellow arrow on the floor points to the front. The panel at the top left warns you if something's missing, like no seat or no engine.
+
+**Save** keeps your vehicle (type a name first). **Load...** brings back a saved vehicle or a starter. Saved vehicles also show up when you press Tab in the test map.
+
+## Driving controls
 
 | Action | Keyboard | Gamepad |
 |---|---|---|
@@ -31,6 +50,7 @@ From nothing to driving in about 15 minutes.
 | Brake | Space | B |
 | Flip upright | R | Y |
 | Next vehicle | Tab | Back / View |
+| Back to the garage | G | Start / Menu |
 
 ## Things to try
 
@@ -38,9 +58,9 @@ From nothing to driving in about 15 minutes.
 - Drive the **Buggy** into the **pond** (to the right). It floats, but it's stuck, because wheels can't swim.
 - Press **Tab** for the **Amphibian**. Its floats and propellers get it across the pond and up the ramp on the far side.
 
-## Make your own vehicle (no code needed)
+## Make a vehicle by hand (the JSON way)
 
-Vehicles are **blueprints**: JSON files in `data/blueprints/`. Each part has a grid position `[x, y, z]`:
+The garage is the easy way, but vehicles are just **blueprints**: JSON files in `data/blueprints/`. Each part has a grid position `[x, y, z]`:
 
 - **x** is left (−) / right (+).
 - **y** is down (−) / up (+).
@@ -51,8 +71,7 @@ To make one:
 
 1. Copy `buggy.json` to `my_car.json` and change the `"name"`.
 2. Add, move or remove parts. The part types are listed in `data/parts.json`.
-3. In Godot, click the **TestMap** node. In the Inspector, add your file to the **Blueprints** list.
-4. Press F5, then Tab until you reach your vehicle.
+3. Everything in `data/blueprints/` appears in the garage's **Load...** menu and in the test map's Tab list.
 
 Rules the physics enforces:
 
@@ -84,7 +103,10 @@ project.godot          Godot project settings (uses Jolt physics)
 data/parts.json        the part catalog: every part's numbers
 data/blueprints/       vehicles, as lists of parts on a grid
 vehicle/vehicle.gd     turns a blueprint into a physics body and applies wheel, float and propeller forces
-vehicle/part_catalog.gd  loads the JSON files
+vehicle/part_catalog.gd  loads and saves the JSON files
+vehicle/part_visuals.gd  what each part looks like (shared by the garage and the test map)
+garage/                the garage editor (garage.gd) and its orbit camera
+game.gd                global state: carries your build between the garage and the test map
 world/test_map.tscn    the test level
 world/main.gd          spawns the vehicle and reads your controls
 world/input_setup.gd   the key and gamepad bindings
@@ -104,3 +126,9 @@ godot --headless --path . --script res://tests/drive_test.gd -- amphibian ramp
 ```
 
 The scenarios are `straight`, `turn`, `pond` and `ramp`.
+
+The garage test clicks around like a player would, so it needs a window:
+
+```
+godot --path . --script res://tests/garage_test.gd
+```

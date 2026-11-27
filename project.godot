@@ -7,9 +7,13 @@ config_version=5
 
 config/name="Bodgeworks"
 config/description="Bolt parts together, drive what you built."
-run/main_scene="res://world/test_map.tscn"
+run/main_scene="res://garage/garage.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+Game="*res://game.gd"
 
 [display]
 

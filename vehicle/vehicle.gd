@@ -66,6 +66,12 @@ func build(blueprint: Dictionary) -> void:
 
 	# Mass properties: summed from the parts.
 	var com := weighted / total_mass
+	# Shift everything so the vehicle's origin sits under its centre of mass,
+	# wherever it was built on the garage grid.
+	var shift := Vector3(com.x, 0.0, com.z)
+	for p in parts:
+		p.pos -= shift
+	com -= shift
 	mass = total_mass
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = com
@@ -97,15 +103,11 @@ func build(blueprint: Dictionary) -> void:
 
 func _add_part(p: Dictionary, com: Vector3) -> void:
 	var def: Dictionary = p.def
-	var color := Color(def.get("color", "#cccccc"))
-
 	if def.has("wheel"):
 		var w: Dictionary = def.wheel
-		var visual := Node3D.new()
+		var visual := PartVisuals.create(p.id, def)
 		visual.position = p.pos
 		add_child(visual)
-		visual.add_child(_mesh_cylinder(w.radius, 0.4, color, Vector3(0, 0, PI / 2)))
-		visual.add_child(_mesh_cylinder(w.radius * 0.45, 0.42, Color("#9a9a9a"), Vector3(0, 0, PI / 2)))
 		wheels.append({
 			"pos": p.pos,
 			"radius": float(w.radius),
@@ -125,30 +127,13 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 	shape.position = p.pos
 	add_child(shape)
 
-	var root := Node3D.new()
+	var root := PartVisuals.create(p.id, def)
 	root.position = p.pos
 	root.basis = p.basis
 	add_child(root)
-
-	match p.id:
-		"seat":
-			root.add_child(_mesh_box(Vector3(0.9, 0.3, 0.9), Vector3(0, -0.35, 0), color))
-			root.add_child(_mesh_box(Vector3(0.9, 0.8, 0.2), Vector3(0, 0.05, 0.35), color))
-		"float":
-			root.add_child(_mesh_cylinder(0.45, 0.95, color, Vector3(PI / 2, 0, 0)))
-		"propeller":
-			root.add_child(_mesh_cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
-			var blades := Node3D.new()
-			blades.position = Vector3(0, 0, 0.3)
-			blades.add_child(_mesh_box(Vector3(0.9, 0.12, 0.05), Vector3.ZERO, color))
-			blades.add_child(_mesh_box(Vector3(0.12, 0.9, 0.05), Vector3.ZERO, color))
-			root.add_child(blades)
-			p["spinner"] = blades
-		"engine":
-			root.add_child(_mesh_box(Vector3(0.9, 0.7, 0.9), Vector3(0, -0.15, 0), color))
-			root.add_child(_mesh_cylinder(0.08, 0.5, Color("#333333"), Vector3.ZERO, Vector3(0.25, 0.35, 0.3)))
-		_:
-			root.add_child(_mesh_box(Vector3.ONE * CELL * 0.98, Vector3.ZERO, color))
+	var spinner := root.get_node_or_null("Spinner")
+	if spinner:
+		p["spinner"] = spinner
 
 	if def.has("seat"):
 		has_seat = true
@@ -284,35 +269,3 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 
 func speed_kmh() -> float:
 	return linear_velocity.length() * 3.6
-
-
-# --- little mesh helpers -------------------------------------------------
-
-func _material(color: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = 0.8
-	return m
-
-
-func _mesh_box(size: Vector3, offset: Vector3, color: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = _material(color)
-	mi.mesh = mesh
-	mi.position = offset
-	return mi
-
-
-func _mesh_cylinder(radius: float, height: float, color: Color, rot: Vector3, offset := Vector3.ZERO) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.material = _material(color)
-	mi.mesh = mesh
-	mi.rotation = rot
-	mi.position = offset
-	return mi

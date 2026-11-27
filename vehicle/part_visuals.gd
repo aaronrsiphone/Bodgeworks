@@ -1,0 +1,76 @@
+class_name PartVisuals
+## Builds the 3D look of each part. Shared by the garage and the driving game,
+## so a part looks the same in both. Parts with no special look are a plain
+## coloured cube, so a new part in parts.json shows up without any code.
+
+
+## Returns a Node3D centred on the part's grid cell.
+## Propellers have a child called "Spinner" that the vehicle spins.
+static func create(id: String, def: Dictionary) -> Node3D:
+	var color := Color(def.get("color", "#cccccc"))
+	var root := Node3D.new()
+	root.name = id.capitalize()
+
+	if def.has("wheel"):
+		var r := float(def.wheel.get("radius", 0.45))
+		root.add_child(cylinder(r, 0.4, color, Vector3(0, 0, PI / 2)))
+		root.add_child(cylinder(r * 0.45, 0.42, Color("#9a9a9a"), Vector3(0, 0, PI / 2)))
+		return root
+
+	match id:
+		"seat":
+			root.add_child(box(Vector3(0.9, 0.3, 0.9), Vector3(0, -0.35, 0), color))
+			root.add_child(box(Vector3(0.9, 0.8, 0.2), Vector3(0, 0.05, 0.35), color))
+		"float":
+			root.add_child(cylinder(0.45, 0.95, color, Vector3(PI / 2, 0, 0)))
+		"propeller":
+			root.add_child(cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
+			var blades := Node3D.new()
+			blades.name = "Spinner"
+			blades.position = Vector3(0, 0, 0.3)
+			blades.add_child(box(Vector3(0.9, 0.12, 0.05), Vector3.ZERO, color))
+			blades.add_child(box(Vector3(0.12, 0.9, 0.05), Vector3.ZERO, color))
+			root.add_child(blades)
+		"engine":
+			root.add_child(box(Vector3(0.9, 0.7, 0.9), Vector3(0, -0.15, 0), color))
+			root.add_child(cylinder(0.08, 0.5, Color("#333333"), Vector3.ZERO, Vector3(0.25, 0.35, 0.3)))
+		_:
+			root.add_child(box(Vector3.ONE * 0.98, Vector3.ZERO, color))
+	return root
+
+
+static func material(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.8
+	return m
+
+
+static func box(size: Vector3, offset: Vector3, color: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh.material = material(color)
+	mi.mesh = mesh
+	mi.position = offset
+	return mi
+
+
+static func cylinder(radius: float, height: float, color: Color, rot: Vector3, offset := Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = height
+	mesh.material = material(color)
+	mi.mesh = mesh
+	mi.rotation = rot
+	mi.position = offset
+	return mi
+
+
+## A small square icon in the part's colour, for buttons.
+static func icon(def: Dictionary, size := 20) -> ImageTexture:
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(def.get("color", "#cccccc")))
+	return ImageTexture.create_from_image(img)
