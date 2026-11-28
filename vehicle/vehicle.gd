@@ -52,7 +52,7 @@ var has_seat := false
 var fuel := 0.0 # fuel left
 var fuel_capacity := 0.0 # fuel when full
 var fuel_use := 0.0 # fuel burned per second at full throttle (all engines together)
-var has_tanks := false # false = running on the little reserve under the seat
+var has_tanks := false # false = only the reserve can under the seat
 ## Accessory buttons: button number (1-3) -> the parts wired to it.
 var buttons := {}
 
@@ -551,8 +551,8 @@ static func fuel_for(defs: Array) -> Dictionary:
 			reserve = maxf(reserve, float(def.seat.get("reserve_fuel", 0)))
 		if def.has("engine"):
 			use += float(def.engine.get("fuel_use", 0))
-	if tanks == 0:
-		capacity = reserve # no tank: you only get the little reserve can
+	# The can under the seat always counts; every tank adds more on top.
+	capacity += reserve
 	return {"capacity": capacity, "use": use, "tanks": tanks}
 
 

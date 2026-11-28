@@ -70,7 +70,7 @@ docs/.gdignore           keeps Godot from importing docs/
 - JSON numbers load as floats, so wrap them in `int()` for grid cells.
 
 **Part** (`data/parts.json`): `name`, `mass`, `buoyancy` (kg it can hold up under water; more than its mass means it floats) and `color`. Behaviour keys:
-- `seat: {reserve_fuel}` — a vehicle needs one to drive. `reserve_fuel` is the fuel a vehicle gets when it has **no** tank (largest seat's value; 30 = 30 s for one engine).
+- `seat: {reserve_fuel}` — a vehicle needs one to drive. `reserve_fuel` is fuel every vehicle gets (largest seat's value; 120 = 2 minutes for one engine). Fuel tanks' capacities add to it.
 - `engine: {force, power, fuel_use}` — engines are summed into one budget. Total push = `min(force, power / speed)`, so power (W) sets the top speed and force (N) the standstill push. `fuel_use` is fuel units per second at full throttle.
 - `fuel: {capacity}` — a fuel tank. Tanks' capacities add up.
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
