@@ -1,5 +1,7 @@
 # Bodgeworks
 
+[![Tests](https://github.com/aaronrsiphone/Bodgeworks/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/aaronrsiphone/Bodgeworks/actions/workflows/tests.yml)
+
 A father–son hackathon project: a physics sandbox where you bolt parts together into vehicles, then use them to beat challenges. Players build from modular parts on a grid, the design compiles into physics, and challenges score the result. Rewards unlock new parts, and new parts open new ways to solve every challenge.
 
 **How we work:** get a minimal playable version first, then iterate. The docs below are a starting point, not gospel. Change them when the game teaches us something.

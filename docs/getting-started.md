@@ -166,3 +166,7 @@ The garage test clicks around like a player would, so it needs a window:
 ```
 godot --path . --script res://tests/garage_test.gd
 ```
+
+### On GitHub
+
+Every pull request, and every push to `main`, runs `tests/run_all.sh` on GitHub with Godot 4.7.2 (see `.github/workflows/tests.yml`). A green tick on the PR means everything passed. If it goes red, open the **Tests** check to read the log. Logs and screenshots from the failed run are attached at the bottom of the run's summary page under **Artifacts**.
