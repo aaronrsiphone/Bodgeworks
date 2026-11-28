@@ -34,6 +34,9 @@ func _run() -> void:
 	var out_dir := _absolute(args[1])
 	var names := args.slice(2)
 	DirAccess.make_dir_recursive_absolute(out_dir)
+	# Inside the project? Keep Godot from importing the PNGs on the next editor open.
+	if out_dir.begins_with(ProjectSettings.globalize_path("res://")) and not FileAccess.file_exists(out_dir.path_join(".gdignore")):
+		FileAccess.open(out_dir.path_join(".gdignore"), FileAccess.WRITE)
 
 	var presets := _pick(PartCatalog.load_json(PRESETS_PATH).get("presets", []), scene, names)
 	if presets.is_empty():
