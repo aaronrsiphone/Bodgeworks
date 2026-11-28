@@ -42,6 +42,7 @@ missions/special_delivery.tscn  the first mission (route around or across the po
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
 tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, six_propellers.json = power-budget test)
+tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/getting-started.md  player/dev guide: install, controls, garage, missions, editing parts/maps
 docs/implementation-plan.md  roadmap; each item links to a GitHub issue
@@ -109,7 +110,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 | Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power>` | no |
 | Garage clicks (10 checks) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
-| Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- out_dir` | yes |
+| Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- <scene\|all> <out_dir> [preset...]` (see Visual review) | yes |
 
 Gotchas:
 - **Headless physics runs in real time.** A 10 s scenario takes about 10 s, so run scenarios in parallel or in the background.
@@ -118,6 +119,37 @@ Gotchas:
 - GDScript can't infer types from Dictionary access. Write `var x: Vector3 = d.foo`, not `:=`.
 - Container screenshots use the software Compatibility renderer, so they look washed out compared with real hardware. That's expected.
 - `docs/.gdignore` keeps Godot from importing docs images. Commit the generated `*.uid` and `*.import` files.
+
+## Visual review
+
+`tests/screenshot.gd` renders PNG screenshots of any scene from named camera presets. Use it to check UI, levels and visuals, and to attach before/after images to PRs (issues labelled `vision-required`).
+
+```
+xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility \
+    --script res://tests/screenshot.gd -- <scene|all> <out_dir> [preset...]
+```
+
+- `all shots/` renders every preset into `shots/`. That folder is git-ignored, and the tool puts a `.gdignore` in any output folder inside the project, so Godot doesn't import the PNGs.
+- `res://garage/garage.tscn shots/` renders only that scene's presets. If the scene has no presets, it takes one shot from the scene's own camera.
+- `all shots/ pond mission_result` renders only the named presets.
+- It exits non-zero and prints `FAIL` if a shot is blank (all one colour), isn't 1280×720, or names an unknown preset or action. The last line is `RESULT: PASS (n shots in <dir>)`.
+
+Presets live in `tests/screenshot_presets.json`. Each one loads its scene fresh. The fields are:
+
+| Field | Meaning |
+|---|---|
+| `name`, `scene` | Required. The output file is `<name>.png`. |
+| `camera` | `{position, look_at, fov?}`. Leave it out to keep the scene's own camera, such as the chase camera following the vehicle. |
+| `blueprint` | Vehicle to load (garage) or spawn first (test map). |
+| `mission` | Mission scene to play in the test map. |
+| `vehicle` | `{position, yaw}` (yaw in degrees): moves the spawned vehicle. |
+| `hold` | Input actions held down while simulating, e.g. `["accelerate"]`. |
+| `action` | Scripted action run before simulating. Right now: `deliver_cargo` (drops the mission cargo into the goal; `mission_time` sets the clock shown). |
+| `seconds` | How long to simulate before the shot. |
+
+The current presets are `garage_overview`, `garage_closeup`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
+
+**Colours look flatter than on real hardware.** Under xvfb, Godot runs the Compatibility (OpenGL) renderer on llvmpipe (software rendering): no Forward+ lighting, weaker shading, and distant ground washes out in the fog. Judge layout, framing, UI and presence of objects, not exact colour or lighting quality.
 
 ## Conventions
 
