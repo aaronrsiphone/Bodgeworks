@@ -60,14 +60,21 @@ func place(cell: Vector3i, id: String, r := 0) -> void:
 	var def := PartCatalog.get_part(id)
 	if def.has("wheel"):
 		r = 0 # wheels always face forward
+	# The whole body turns with the part, so its boxes and its look turn together.
 	var body := StaticBody3D.new()
 	body.position = Vector3(cell)
+	body.basis = Basis(Vector3.UP, r * PI / 2.0)
 	body.set_meta("cell", cell)
-	var shape := CollisionShape3D.new()
-	shape.shape = BoxShape3D.new()
-	body.add_child(shape)
+	# The mouse ray hits the part's real boxes, so you point at what you can see
+	# (a plate is thin, so the space above it is empty). Placing still snaps to cells.
+	for b in PartCatalog.shape_boxes(def):
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = b.size
+		shape.shape = box
+		shape.position = b.offset
+		body.add_child(shape)
 	var visual := PartVisuals.create(id, def)
-	visual.basis = Basis(Vector3.UP, r * PI / 2.0)
 	body.add_child(visual)
 	build_root.add_child(body)
 	parts[cell] = {"part": id, "rot": r, "node": body}

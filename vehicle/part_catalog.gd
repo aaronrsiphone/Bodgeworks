@@ -12,7 +12,10 @@ static var _parts: Dictionary = {}
 static func parts() -> Dictionary:
 	if _parts.is_empty():
 		_parts = load_json(PARTS_PATH)
-		_parts.erase("_comment")
+		# Keys starting with "_" are notes for people, not parts.
+		for key in _parts.keys():
+			if str(key).begins_with("_"):
+				_parts.erase(key)
 	return _parts
 
 
@@ -22,6 +25,27 @@ static func get_part(id: String) -> Dictionary:
 		push_error("Unknown part '%s'. Is it in %s?" % [id, PARTS_PATH])
 		return {}
 	return all[id]
+
+
+## The boxes a part is made of, in the part's own directions (before it's turned).
+## Each is {"size": Vector3, "offset": Vector3} in metres, offset from the middle
+## of the cell. A part without "shape" in parts.json is one whole cell. "shape"
+## can be one box ({"size": ..., "offset": ...}) or a list of them.
+static func shape_boxes(def: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var shape = def.get("shape", null)
+	var list: Array = []
+	if shape is Dictionary:
+		list = [shape]
+	elif shape is Array:
+		list = shape
+	for b in list:
+		var s: Array = b.get("size", [1, 1, 1])
+		var o: Array = b.get("offset", [0, 0, 0])
+		out.append({"size": Vector3(s[0], s[1], s[2]), "offset": Vector3(o[0], o[1], o[2])})
+	if out.is_empty():
+		out.append({"size": Vector3.ONE, "offset": Vector3.ZERO})
+	return out
 
 
 static func load_blueprint(path: String) -> Dictionary:

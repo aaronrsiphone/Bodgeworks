@@ -66,9 +66,10 @@ func build(blueprint: Dictionary) -> void:
 			"mass": float(def.get("mass", 10)),
 			"buoyancy": float(def.get("buoyancy", 0)),
 		}
+		_add_boxes(p)
 		parts.append(p)
 		total_mass += p.mass
-		weighted += p.pos * p.mass
+		weighted += (p.pos + p.middle) * p.mass
 
 	if parts.is_empty():
 		push_error("Blueprint '%s' has no parts" % blueprint_name)
@@ -85,14 +86,18 @@ func build(blueprint: Dictionary) -> void:
 	mass = total_mass
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = com
+	# Inertia (how hard it is to spin): every box adds its own spin resistance,
+	# plus more the further it is from the centre of mass.
 	var inertia_sum := Vector3.ZERO
 	for p in parts:
-		var d: Vector3 = p.pos - com
-		var box: float = p.mass * (CELL * CELL) / 6.0 # solid cube
-		inertia_sum += Vector3(
-			box + p.mass * (d.y * d.y + d.z * d.z),
-			box + p.mass * (d.x * d.x + d.z * d.z),
-			box + p.mass * (d.x * d.x + d.y * d.y))
+		for b in p.boxes:
+			var m: float = p.mass * b.share
+			var s: Vector3 = b.size
+			var d: Vector3 = p.pos + b.offset - com
+			inertia_sum += Vector3(
+				m * (s.y * s.y + s.z * s.z) / 12.0 + m * (d.y * d.y + d.z * d.z),
+				m * (s.x * s.x + s.z * s.z) / 12.0 + m * (d.x * d.x + d.z * d.z),
+				m * (s.x * s.x + s.y * s.y) / 12.0 + m * (d.x * d.x + d.y * d.y))
 	inertia = inertia_sum
 
 	for p in parts:
@@ -109,6 +114,31 @@ func build(blueprint: Dictionary) -> void:
 		push_warning("'%s' has no seat, so nobody can drive it." % blueprint_name)
 	if engine_force == 0.0:
 		push_warning("'%s' has no engine, so wheels and propellers won't push." % blueprint_name)
+
+
+## Works out the boxes a part is made of (from "shape" in parts.json), turned the
+## way the part faces. Thin parts like plates are just smaller boxes. Stores:
+##   p.boxes   [{size, offset, share}], share = the part of its mass in that box
+##   p.middle  where its weight is, from the middle of its cell
+##   p.height  how tall it is, for working out how much of it is under water
+func _add_boxes(p: Dictionary) -> void:
+	var boxes: Array[Dictionary] = []
+	var volume := 0.0
+	for b in PartCatalog.shape_boxes(p.def):
+		var size: Vector3 = (p.basis * b.size).abs() * CELL # turned 90 degrees, x and z swap
+		boxes.append({"size": size, "offset": p.basis * b.offset * CELL, "volume": size.x * size.y * size.z})
+		volume += size.x * size.y * size.z
+	var middle := Vector3.ZERO
+	var low := INF
+	var high := -INF
+	for b in boxes:
+		b.share = b.volume / volume # bigger boxes get more of the weight
+		middle += b.offset * b.share
+		low = minf(low, b.offset.y - b.size.y / 2.0)
+		high = maxf(high, b.offset.y + b.size.y / 2.0)
+	p.boxes = boxes
+	p.middle = middle
+	p.height = high - low
 
 
 func _add_part(p: Dictionary, com: Vector3) -> void:
@@ -130,12 +160,15 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 		})
 		return # wheels touch the ground with rays, not collision boxes
 
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3.ONE * CELL * 0.98
-	shape.shape = box
-	shape.position = p.pos
-	add_child(shape)
+	# One collision box per box in the part's shape (a whole cell if it has no shape).
+	# A touch smaller than the real size so neighbouring parts don't overlap.
+	for b in p.boxes:
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = (b.size - Vector3.ONE * 0.02).max(Vector3.ONE * 0.02)
+		shape.shape = box
+		shape.position = p.pos + b.offset
+		add_child(shape)
 
 	var root := PartVisuals.create(p.id, def)
 	root.position = p.pos
@@ -254,19 +287,19 @@ func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive: float)
 		vis.basis = Basis(Vector3.UP, _steer_angle if w.steers else 0.0) * Basis(Vector3.RIGHT, w.spin)
 
 
-## How much of a one-cell part at this point is under water: 0 (dry) to 1 (fully under).
-func submerged_at(point: Vector3) -> float:
+## How much of a part this tall, centred at this point, is under water: 0 (dry) to 1 (fully under).
+func submerged_at(point: Vector3, height := CELL) -> float:
 	var most := 0.0
 	for water in get_tree().get_nodes_in_group("water"):
 		var depth: float = water.depth_at(point) # how far below the surface the point is
-		most = maxf(most, clampf(depth / CELL + 0.5, 0.0, 1.0))
+		most = maxf(most, clampf(depth / height + 0.5, 0.0, 1.0))
 	return most
 
 
 func _apply_water(com_global: Vector3) -> void:
 	for p in parts:
-		var at := to_global(p.pos)
-		var submerged := submerged_at(at)
+		var at := to_global(p.pos + p.middle)
+		var submerged := submerged_at(at, p.height)
 		if submerged <= 0.0:
 			continue
 		var lift: float = p.buoyancy * GRAVITY * submerged

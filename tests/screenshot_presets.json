@@ -13,6 +13,13 @@
       "seconds": 0.5
     },
     {
+      "name": "garage_carrier",
+      "scene": "res://garage/garage.tscn",
+      "blueprint": "res://tests/blueprints/carrier.json",
+      "camera": {"position": [-3.5, 4.0, -5.0], "look_at": [0.5, 0.3, -0.5]},
+      "seconds": 0.5
+    },
+    {
       "name": "test_map_overview",
       "scene": "res://world/test_map.tscn",
       "camera": {"position": [-30, 45, 50], "look_at": [15, 0, -30]},
