@@ -38,11 +38,12 @@ func _process(_delta: float) -> bool:
 		check(garage.why_not(Vector3i(8, 0, 8)) != "", "floating parts far from the vehicle are not allowed")
 		check(garage.why_not(Vector3i(0, 0, 1)) != "", "can't place inside an existing part")
 		_shot("garage_02_built.png")
-		# Thin parts: put a plate (key 8) on the block we stacked on the seat.
-		_select_key(KEY_8)
+		# Thin parts: put a plate on the block we stacked on the seat. Only the first
+		# ten parts have keys, so pick it like clicking its button in the bar.
+		garage._select("plate")
 		_click_cell_top(Vector3(0, 2, 1), MOUSE_BUTTON_LEFT)
 	if frame == 30:
-		check(garage.parts.get(Vector3i(0, 3, 1), {}).get("part") == "plate", "picked plate with key 8 and placed it")
+		check(garage.parts.get(Vector3i(0, 3, 1), {}).get("part") == "plate", "picked plate from the bar and placed it")
 		# The plate is thin: its top is 0.3 m below the middle of its cell. Clicking there stacks on it.
 		_click_cell_top(Vector3(0, 3, 1), MOUSE_BUTTON_LEFT, -0.3)
 	if frame == 35:
@@ -52,14 +53,11 @@ func _process(_delta: float) -> bool:
 		_key(KEY_Z, true) # undo both plates so the counts below stay the same
 	if frame == 42:
 		check(not garage.parts.has(Vector3i(0, 3, 1)), "ctrl+z removed the plates again")
-		_select_key(KEY_0) # the tenth part
-	if frame == 44:
-		check(garage.selected == "tray", "key 0 picks the tenth part (tray), got %s" % garage.selected)
 	if frame == 46:
-		_select_key(KEY_7) # spring
+		_select_key(KEY_0) # spring (the 10th part)
 		_click_cell_top(Vector3(1, 2, 2), MOUSE_BUTTON_LEFT) # on top of the propeller
 	if frame == 50:
-		check(garage.parts.get(Vector3i(1, 3, 2), {}).get("part") == "spring", "picked spring with key 7 and placed it")
+		check(garage.parts.get(Vector3i(1, 3, 2), {}).get("part") == "spring", "picked spring with key 0 and placed it")
 		_key(KEY_B) # wire mode
 		_click_cell_top(Vector3(1, 3, 2), MOUSE_BUTTON_LEFT) # spring: unwired -> button 1
 	if frame == 55:

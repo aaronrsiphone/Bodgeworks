@@ -28,7 +28,7 @@ The game starts in the **garage**, with the Buggy ready to change.
 
 | Do this | How |
 |---|---|
-| Pick a part | Click it in the bottom bar, or press 1–9, or 0 for the tenth part |
+| Pick a part | Click it in the bottom bar, or press 1–9 (0 picks the 10th part). Parts after the 10th are click-only. |
 | Add a part | Left-click. The see-through ghost shows where it goes and snaps onto the face of the part you point at. Red means it can't go there. |
 | Remove a part | Right-click it |
 | Rotate the part | R (useful for propellers, which push away from their blades, and for walls and trays). Springs can also point down and up: keep pressing R. |
@@ -42,7 +42,7 @@ Rules: parts must touch the vehicle, a vehicle can have at most 60 parts, and th
 
 ### Thin parts
 
-Not every part fills a whole cell:
+Not every part fills a whole cell (pick these by clicking them in the bar):
 
 - **Plate**: a thin floor at the bottom of its cell.
 - **Wall**: a thin wall at the back of its cell. Turn it with R to put it on another side.
@@ -95,6 +95,8 @@ To make your own delivery mission, duplicate `missions/special_delivery.tscn`, t
 - Drive the **Buggy** into the **pond** (to the right). It floats, but it's stuck, because wheels can't swim.
 - Press **Tab** for the **Amphibian**. Its floats and propellers get it across the pond and up the ramp on the far side.
 - Press **Tab** again for the **Hopper**. Press 1 to jump, and 2 to kick a crate.
+- Press **Tab** again for the **Plane**. Point it down a long, clear stretch (the east side of the map is best) and hold **W**. It takes off by itself at about 55 km/h and keeps climbing. Steer gently!
+- Put **Flat Wings** on the sides of the Buggy, and a couple at the back as a tail, then hit the jump ramp. You glide much further.
 
 ## Make a vehicle by hand (the JSON way)
 
@@ -121,6 +123,12 @@ Rules the physics enforces:
 - Propellers push from where they are, so one off to the side will turn you.
 - Propellers swivel when you steer, like an outboard motor. That's how you steer in water.
 - Wheels only grip the ground. They can't climb on crates, so push things with your body or forks.
+- A normal **Propeller** is a boat propeller: in the air it only gives a fifth of its push. An **Air Propeller** (orange) pushes just as hard in the air as in water, so it's the one for planes.
+- Wings lift when air flows over them, and the faster you go, the more they lift. They push from where they are, just like propellers.
+- **Wing** (cream) is curved: it lifts even when it's level, so it's the one that gets a plane off the ground. But on a car it makes the tyres light and slippy.
+- **Flat Wing** (pale blue) only lifts when it's tilted into the wind. Use it as a **tail**: a few flat wings well behind the middle keep the nose pointing where you're going, like the feathers on a dart. Without a tail, a plane or a glider tips its nose up and flops.
+- Tilt the wing too steeply (more than about 15°) and it **stalls**: most of the lift suddenly goes away.
+- Wings do nothing under water.
 
 ## Make a new part (still no code)
 
@@ -130,7 +138,8 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.force` and `engine.top_speed`: how much push the engine gives, and up to what speed.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
-- `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth).
+- `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth for a boat **Propeller**; 1.0 for an **Air Propeller**).
+- `wing.area`, `wing.lift`, `wing.stall` and `wing.camber`: how big the wing is in square metres, how strongly it lifts, the angle in degrees where it stalls, and how much it lifts when perfectly level.
 - `shape`: makes a part thinner than a whole cell. It's a list of boxes, each with a `size` `[x, y, z]` in metres and an `offset` from the middle of the cell. For example, `{"size": [1, 0.2, 1], "offset": [0, -0.4, 0]}` is a plate lying on the bottom of the cell. The boxes are what you see, what things bump into, and where the part's weight is. Look at the Plate, Wall and Tray to see how it works.
 - `spring.impulse`, `spring.kick_speed`, `spring.reach` and `spring.cooldown`: how hard a spring kicks, the fastest it can fling a crate, how far its foot stretches, and how long it takes to reload.
 - `can_face_up_down: true` lets R point the part down and up in the garage.
@@ -147,7 +156,7 @@ Open `world/test_map.tscn`. The ground, ramps and pond are **CSG** boxes and sph
 project.godot          Godot project settings (uses Jolt physics)
 data/parts.json        the part catalog: every part's numbers
 data/blueprints/       vehicles, as lists of parts on a grid
-vehicle/vehicle.gd     turns a blueprint into a physics body and applies wheel, float and propeller forces
+vehicle/vehicle.gd     turns a blueprint into a physics body and applies wheel, float, propeller and wing forces
 vehicle/part_catalog.gd  loads and saves the JSON files
 vehicle/part_visuals.gd  what each part looks like (shared by the garage and the test map)
 garage/                the garage editor (garage.gd) and its orbit camera
@@ -179,7 +188,7 @@ godot --headless --path . --script res://tests/drive_test.gd -- buggy straight
 godot --headless --path . --script res://tests/drive_test.gd -- amphibian ramp
 ```
 
-The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates), `swim` (steer in the pond), `hop` (press 1 and the spring must lift it over 0.5 m) and `kick` (press 2 and the spring must kick a crate over 3 m). Use `forklift` instead of `buggy` to try the test vehicle with forks, or `hopper` for the springs. The checks are at the bottom of `tests/drive_test.gd`, in `_check_expectations()`.
+The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates), `swim` (steer in the pond), `jump` (off the jump ramp; with a winged vehicle, the plain buggy jumps first to compare), `fly` (full throttle down the long east side), `hop` (press 1 and the spring must lift it over 0.5 m) and `kick` (press 2 and the spring must kick a crate over 3 m). Use `forklift`, `winged_buggy`, `plane` or `hopper` instead of `buggy` to try another vehicle, or give a blueprint's path, like `res://data/blueprints/plane.json`. The checks are at the bottom of `tests/drive_test.gd`, in `_check_expectations()`.
 
 An autopilot can play the delivery mission and report the time. It fails if it doesn't finish, or is slower than silver:
 

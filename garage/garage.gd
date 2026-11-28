@@ -257,7 +257,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_B:
 			set_wiring(not wiring)
 		elif event.keycode >= KEY_0 and event.keycode <= KEY_9:
-			# 1-9 pick the first nine parts, and 0 (next to 9 on the keyboard) the tenth.
+			# 1-9 pick the first nine parts; 0 picks the tenth (like the keyboard's number row).
 			var i: int = 9 if event.keycode == KEY_0 else event.keycode - KEY_1
 			if i < part_ids.size():
 				_select(part_ids[i])
@@ -521,39 +521,45 @@ func _build_ui() -> void:
 			if best.tier != "":
 				b.icon = _medal_icon(Game.TIER_COLORS[best.tier])
 
-	# Bottom: one button per part.
-	var bar := HBoxContainer.new()
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.alignment = BoxContainer.ALIGNMENT_CENTER
-	bar.anchor_top = 1.0
-	bar.anchor_bottom = 1.0
-	bar.anchor_right = 1.0
-	bar.offset_top = -64
-	bar.offset_bottom = -16
-	ui.add_child(bar)
-	for i in part_ids.size():
-		var id := part_ids[i]
-		var def := PartCatalog.get_part(id)
-		var b := _button(bar, "%d  %s" % [(i + 1) % 10, def.get("name", id)], _select.bind(id))
-		b.toggle_mode = true
-		b.icon = PartVisuals.icon(def)
-		b.custom_minimum_size.y = 44
-		_part_buttons[id] = b
+	# Bottom: the help line, then one button per part. The buttons wrap onto
+	# more rows when there are too many for one, and the whole block grows
+	# upwards from the bottom of the screen, so every part stays clickable.
+	var bottom := VBoxContainer.new()
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.anchor_top = 1.0
+	bottom.anchor_bottom = 1.0
+	bottom.anchor_right = 1.0
+	bottom.offset_left = 8
+	bottom.offset_right = -8
+	bottom.offset_bottom = -16
+	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bottom.add_theme_constant_override("separation", 6)
+	ui.add_child(bottom)
 
 	var help := Label.new()
 	_help = help
 	help.text = _help_text()
 	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	help.anchor_top = 1.0
-	help.anchor_bottom = 1.0
-	help.anchor_right = 1.0
-	help.offset_top = -96
-	help.offset_bottom = -70
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.add_theme_font_size_override("font_size", 15)
 	help.add_theme_constant_override("outline_size", 5)
 	help.add_theme_color_override("font_outline_color", Color.BLACK)
-	ui.add_child(help)
+	bottom.add_child(help)
+
+	var bar := HFlowContainer.new()
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.alignment = FlowContainer.ALIGNMENT_CENTER
+	bar.add_theme_constant_override("v_separation", 4)
+	bottom.add_child(bar)
+	for i in part_ids.size():
+		var id := part_ids[i]
+		var def := PartCatalog.get_part(id)
+		var key := str((i + 1) % 10) if i < 10 else "" # the 10th part is key 0; after that, click only
+		var b := _button(bar, ("%s  %s" % [key, def.get("name", id)]).strip_edges(), _select.bind(id))
+		b.toggle_mode = true
+		b.icon = PartVisuals.icon(def)
+		b.custom_minimum_size.y = 44
+		_part_buttons[id] = b
 
 	_toast = Label.new()
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
