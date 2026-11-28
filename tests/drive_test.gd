@@ -4,7 +4,7 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power", "airprop"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power", "airprop", "fuel"]
 # "power": swims the 2-propeller Amphibian, then a 6-propeller copy with the same ONE
 # engine, down the pond. The power budget means 6 propellers mustn't be much faster.
 const POWER_BLUEPRINTS := ["res://data/blueprints/amphibian.json", "res://tests/blueprints/six_propellers.json"]
@@ -12,7 +12,7 @@ const POWER_SWAP_FRAME := 300 # each one swims for 5 s
 # "airprop": on dry land, a wheel-less sled with an air propeller must slide along,
 # and the same sled with a water propeller must not move (it only pushes in water).
 const AIRPROP_BLUEPRINTS := ["res://tests/blueprints/air_sled.json", "res://tests/blueprints/water_sled.json"]
-const VEHICLES := ["buggy", "amphibian", "forklift"]
+const VEHICLES := ["buggy", "amphibian", "forklift", "buggy_tank"]
 const FRAMES := 600
 
 var main: Node
@@ -31,6 +31,10 @@ var failures := 0
 var speed_samples: Array[Vector2] = [] # (time s, forward distance m), for straight's cruise speed
 var power_top_kmh := [0.0, 0.0] # top swim speed of each "power" blueprint
 var sled_moved := [0.0, 0.0] # how far each "airprop" sled got (m)
+const FUEL_RESERVE := 2.0 # "fuel" scenario: a tiny seat reserve, so a tankless buggy runs dry fast
+var fuel_start := 0.0
+var fuel_out_at := -1.0 # seconds when the fuel hit zero (-1 = never)
+var top_speed_seen := 0.0
 
 
 func _initialize() -> void:
@@ -48,6 +52,8 @@ func _initialize() -> void:
 		main.blueprints.assign(["res://data/blueprints/amphibian.json"])
 	if vehicle_arg == "forklift":
 		main.blueprints.assign(["res://tests/blueprints/forklift.json"])
+	if vehicle_arg == "buggy_tank":
+		main.blueprints.assign(["res://tests/blueprints/buggy_tank.json"])
 	root.add_child(main)
 	print("physics engine: ", ProjectSettings.get_setting("physics/3d/physics_engine"))
 
@@ -87,6 +93,11 @@ func _physics_process(_delta: float) -> bool:
 		if scenario == "ramp":
 			# Line up on the boat ramp facing into the pond (+x).
 			v.global_transform = Transform3D(Basis(Vector3.UP, -PI / 2), Vector3(15, 1, -10))
+		if scenario == "fuel" and not v.has_tanks:
+			# Shrink the seat's reserve can, so it runs out after FUEL_RESERVE s of full throttle.
+			v.fuel_capacity = FUEL_RESERVE
+			v.fuel = FUEL_RESERVE
+		fuel_start = v.fuel
 		start_pos = v.global_position
 		last_heading = _heading(v)
 	match scenario:
@@ -120,6 +131,11 @@ func _physics_process(_delta: float) -> bool:
 			if frame > 30: Input.action_press("accelerate")
 	if scenario == "straight" and frame % 30 == 0:
 		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
+		"fuel":
+			if frame > 60: Input.action_press("accelerate")
+			if fuel_out_at < 0.0 and v.fuel <= 0.0:
+				fuel_out_at = frame / 60.0
+			top_speed_seen = maxf(top_speed_seen, v.speed_kmh())
 	min_upright = minf(min_upright, v.global_basis.y.y)
 	if frame > 2:
 		var h := _heading(v)
@@ -138,6 +154,8 @@ func _physics_process(_delta: float) -> bool:
 		print("t=%4.1fs pos=(%6.1f %5.2f %6.1f) speed=%5.1f km/h upright=%.2f wheels_down=%d heading=%4.0f" % [
 			frame / 60.0, v.global_position.x, v.global_position.y, v.global_position.z,
 			v.speed_kmh(), up.y, grounded, heading])
+		if scenario == "fuel":
+			print("        fuel=%.2f / %.0f" % [v.fuel, v.fuel_capacity])
 		if crate:
 			print("        crate=(%6.1f %5.2f %6.1f) %.1f m ahead" % [crate.position.x, crate.position.y, crate.position.z, (crate.position - v.global_position).dot(-v.global_basis.z)])
 	if frame == FRAMES:
@@ -203,6 +221,18 @@ func _check_expectations(v: Vehicle) -> void:
 			check(moved >= 60.0, "drove up the boat ramp and on at least 60 m (%.1f m)" % moved)
 		"swim":
 			check(absf(turned) > 60.0, "heading changed by more than 60 deg in the water (%.0f deg)" % turned)
+		"fuel":
+			var speed := v.speed_kmh()
+			if v.has_tanks:
+				check(v.fuel > 0.0, "still has fuel after 9 s of full throttle (%.1f left)" % v.fuel)
+				var burned := fuel_start - v.fuel
+				check(absf(burned - 9.0 * v.fuel_use) < 0.5, "burned about %.1f fuel (%.1f)" % [9.0 * v.fuel_use, burned])
+				check(speed > 30.0, "kept driving to the end (%.0f km/h > 30)" % speed)
+			else:
+				# Throttle goes down at t = 1 s, so the reserve should run dry at 1 + reserve / use.
+				var expected := 1.0 + FUEL_RESERVE / v.fuel_use
+				check(absf(fuel_out_at - expected) < 0.2, "ran out of fuel at about %.1f s (%.2f s)" % [expected, fuel_out_at])
+				check(speed < 0.6 * top_speed_seen, "slowed down once the fuel ran out (%.0f km/h, best %.0f)" % [speed, top_speed_seen])
 		"pond":
 			if vehicle_arg == "amphibian":
 				check(moved >= 10.0, "swam at least 10 m across the pond (%.1f m)" % moved)

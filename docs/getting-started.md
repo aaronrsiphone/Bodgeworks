@@ -111,6 +111,7 @@ Rules the physics enforces:
 - Propellers push from where they are, so one off to the side will turn you.
 - Propellers swivel when you steer, like an outboard motor. That's how you steer in water.
 - Wheels only grip the ground. They can't climb on crates, so push things with your body or forks.
+- Engines burn **fuel** while you hold the throttle. Without a **Fuel Tank**, you only get the little reserve can under the seat (30 seconds of full throttle). Each tank adds 30 more seconds but weighs 40 kg. When you run dry, the wheels and propellers stop pushing. Fuel fills up again when you respawn (Tab), restart a mission (T), or go back to the garage (G). The garage panel shows how many seconds your fuel lasts, and the driving screen shows a fuel gauge if you have tanks.
 
 ## Make a new part (still no code)
 
@@ -119,6 +120,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `mass`: weight in kg.
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.power` and `engine.force`: power is how fast it can keep pushing (more power = higher top speed). Force is the most push it gives when you're standing still.
+- `engine.fuel_use`: how much fuel the engine burns per second at full throttle. `fuel.capacity` is how much a fuel tank holds. `seat.reserve_fuel` is the little can you get when there's no tank.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
 - `thrust.force`, `thrust.steer`, `thrust.air`, `thrust.water` and `thrust.blade`: the most a propeller can push (it also needs engine power), how many degrees it swivels when you steer, how much of its push it keeps out of the water and under water (1 = all, 0 = none), and how long its blades look.
 - `shape`: makes a part thinner than a whole cell. It's a list of boxes, each with a `size` `[x, y, z]` in metres and an `offset` from the middle of the cell. For example, `{"size": [1, 0.2, 1], "offset": [0, -0.4, 0]}` is a plate lying on the bottom of the cell. The boxes are what you see, what things bump into, and where the part's weight is. Look at the Plate, Wall and Tray to see how it works.

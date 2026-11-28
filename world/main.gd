@@ -86,4 +86,11 @@ func _process(_delta: float) -> void:
 		return
 	var keys := "R  flip upright     G  back to garage" if mission else "R  flip upright     Tab  next vehicle     G  back to garage"
 	hud.text = "%s   %d km/h   %d kg" % [vehicle.blueprint_name, roundi(vehicle.speed_kmh()), roundi(vehicle.mass)]
+	# Fuel gauge: only for vehicles with fuel tanks, but everyone hears when they run dry.
+	if vehicle.fuel_use > 0.0 and vehicle.fuel <= 0.0:
+		hud.text += "   OUT OF FUEL! (T restart / G garage)" if mission else "   OUT OF FUEL! (Tab / G to refill)"
+	elif vehicle.has_tanks and vehicle.fuel_capacity > 0.0:
+		var full := vehicle.fuel / vehicle.fuel_capacity
+		var bars := ceili(full * 10.0)
+		hud.text += "   Fuel [%s%s] %d%%" % ["|".repeat(bars), ".".repeat(10 - bars), roundi(full * 100.0)]
 	keys_label.text = "W/S  drive / reverse     A/D  steer     Space  brake\n" + keys

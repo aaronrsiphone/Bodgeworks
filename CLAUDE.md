@@ -41,7 +41,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test, buggy_tank.json = buggy + fuel tank)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
@@ -66,8 +66,9 @@ docs/.gdignore           keeps Godot from importing docs/
 - JSON numbers load as floats, so wrap them in `int()` for grid cells.
 
 **Part** (`data/parts.json`): `name`, `mass`, `buoyancy` (kg it can hold up under water; more than its mass means it floats) and `color`. Behaviour keys:
-- `seat: {}` — a vehicle needs one to drive.
-- `engine: {force, power}` — engines are summed into one budget. Total push = `min(force, power / speed)`, so power (W) sets the top speed and force (N) the standstill push.
+- `seat: {reserve_fuel}` — a vehicle needs one to drive. `reserve_fuel` is the fuel a vehicle gets when it has **no** tank (largest seat's value; 30 = 30 s for one engine).
+- `engine: {force, power, fuel_use}` — engines are summed into one budget. Total push = `min(force, power / speed)`, so power (W) sets the top speed and force (N) the standstill push. `fuel_use` is fuel units per second at full throttle.
+- `fuel: {capacity}` — a fuel tank. Tanks' capacities add up.
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
 - `thrust: {force, steer, air, water, blade}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water and `water` (0–1, default 1) under water. `blade` is the visual blade length. Parts: `propeller` (Water Propeller: air 0, water 1) and `air_propeller` (air 1, water 0.3).
 
@@ -87,6 +88,7 @@ A part with no special look renders as a cube, so new parts need no code unless 
 - **Propellers:** their power share, capped at `thrust.force × lerp(air, water, submerged)`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
 - **Water:** per part, `submerged_at(point, height)` gives buoyancy at the part's centre of mass, scaled by its shape's height, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. That includes cargo on a flat plate (it slides off on the first turn); trays hold it with their rims. Air drag is quadratic.
+- **Fuel:** `fuel` drains by `fuel_use × |throttle| × delta`. At 0 the power budget is off: no wheel drive or propeller push. `Vehicle.fuel_for(defs)` sums the numbers and the garage uses it too. A new Vehicle starts full, so respawn, restart and garage all refill. (Burn follows the throttle, not the power actually used.)
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
 
 ## Testing
@@ -110,7 +112,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power\|airprop>` | no |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|buggy_tank> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power\|airprop\|fuel>` | no |
 | Garage clicks (mirror mode, thin parts, ...) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Mission, carrying | same, with `-- res://tests/blueprints/carrier.json carry`: puts the crate in the trays at the start, fails if it isn't still in them at the finish (expect gold, about 9.9 s) | no |
