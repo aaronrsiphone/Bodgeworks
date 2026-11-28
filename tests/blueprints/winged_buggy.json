@@ -1,0 +1,15 @@
+{
+  "_comment": "The starter buggy with flat wings: a long one on each side, and a little tail at the back to keep the nose steady. For the jump test.",
+  "name": "Winged Buggy (test)",
+  "parts": [
+    { "part": "block", "pos": [0, 0, 0] }, { "part": "block", "pos": [1, 0, 0] },
+    { "part": "block", "pos": [0, 0, 1] }, { "part": "block", "pos": [1, 0, 1] },
+    { "part": "block", "pos": [0, 0, 2] }, { "part": "block", "pos": [1, 0, 2] },
+    { "part": "seat", "pos": [0, 1, 1] }, { "part": "engine", "pos": [1, 1, 2] },
+    { "part": "wheel", "pos": [-1, 0, 0] }, { "part": "wheel", "pos": [2, 0, 0] },
+    { "part": "wheel", "pos": [-1, 0, 2] }, { "part": "wheel", "pos": [2, 0, 2] },
+    { "part": "flat_wing", "pos": [-1, 0, 1] }, { "part": "flat_wing", "pos": [-2, 0, 1] }, { "part": "flat_wing", "pos": [-3, 0, 1] }, { "part": "flat_wing", "pos": [-4, 0, 1] },
+    { "part": "flat_wing", "pos": [2, 0, 1] }, { "part": "flat_wing", "pos": [3, 0, 1] }, { "part": "flat_wing", "pos": [4, 0, 1] }, { "part": "flat_wing", "pos": [5, 0, 1] },
+    { "part": "flat_wing", "pos": [0, 0, 3] }, { "part": "flat_wing", "pos": [1, 0, 3] }
+  ]
+}

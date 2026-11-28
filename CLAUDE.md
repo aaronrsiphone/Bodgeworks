@@ -20,9 +20,9 @@ project.godot            settings: Jolt, autoload Game, layer names, main scene 
 game.gd                  autoload Game: current blueprint, mission list (MISSIONS), save file
                          (user://save.json, best times), tier_for(), format_time(), scene switching
 data/parts.json          PART CATALOG: every part's numbers; behaviours are keys (see below)
-data/blueprints/*.json   starter vehicles (Buggy, Amphibian); appear in garage Load and test-map Tab
+data/blueprints/*.json   starter vehicles (Buggy, Amphibian, Plane); appear in garage Load and test-map Tab
 vehicle/vehicle.gd       Vehicle (RigidBody3D): compiles a blueprint into ONE body, then applies
-                         per-part forces each tick: wheels, propellers, buoyancy, drag. Core physics lives here.
+                         per-part forces each tick: wheels, propellers, wings, buoyancy, drag. Core physics lives here.
 vehicle/part_catalog.gd  PartCatalog: loads parts/blueprints JSON, saves to user://blueprints, lists files
 vehicle/part_visuals.gd  PartVisuals: meshes per part (shared by garage and test map), icon()
 garage/garage.gd         garage editor: ghost placement, remove, rotate, mirror mode (M), undo, save/load, stats panel,
@@ -41,7 +41,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test, buggy_tank.json = buggy + fuel tank)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test, buggy_tank.json = buggy + fuel tank, winged_buggy.json = jump test)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
@@ -71,6 +71,7 @@ docs/.gdignore           keeps Godot from importing docs/
 - `fuel: {capacity}` — a fuel tank. Tanks' capacities add up.
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
 - `thrust: {force, steer, air, water, blade}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water and `water` (0–1, default 1) under water. `blade` is the visual blade length. Parts: `propeller` (Water Propeller: air 0, water 1) and `air_propeller` (air 1, water 0.3).
+- `wing: {area, lift, stall, camber}` — lift and drag from airflow (see Physics model). Two parts use it: `wing` (camber 0.6, lifts when level: for planes) and `flat_wing` (camber 0: tails, and gliding cars that must keep tyre grip).
 
 Optional `shape`: one box `{"size": [x,y,z], "offset": [x,y,z]}` or a list of them, in metres from the cell centre, in the part's unrotated frame (`rot` turns them). They become the vehicle colliders, the garage pick colliders and the default visual (first box in `color`, the rest darker). Mass is split over the boxes by volume, so the centre of mass and inertia use the real shape. Read them with `PartCatalog.shape_boxes(def)`. Thin parts: `plate` (floor), `wall` (back edge), `tray` (plate + rims on back and right; four, rotated rims-out, make a 2×2 bed). Keys in `parts.json` starting with `_` are comments.
 
@@ -86,6 +87,11 @@ A part with no special look renders as a cube, so new parts need no code unless 
   - Tyre force (drive + rolling resistance + side grip) is clamped to `load * grip`, and **applied at axle height** to avoid wheelies and flips.
   - Wheels in front of the centre of mass steer. Steering lock shrinks with speed.
 - **Propellers:** their power share, capped at `thrust.force × lerp(air, water, submerged)`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
+- **Wings:** per wing, from the point velocity (linear + ω × r). α = angle between the airflow and the wing plane (the wing's up is its normal; yaw `rot` doesn't matter). `Cl = camber + WING_SLOPE·α` up to `stall`, then `WING_STALLED·sin 2α`; `Cd = WING_DRAG + WING_INDUCED·Cl² + sin²α`. Force `½·AIR_DENSITY·v²·area` × (Cl perpendicular to the flow, Cd against it) × (1 − submerged), at the wing's position.
+  - `AIR_DENSITY` is 10, not 1.2: game air is thick so 400 kg wooden planes take off at about 15 m/s.
+  - Pitch stability comes from geometry: flat wings well behind the centre of mass act as a tail. A cambered wing ahead of the COM with no tail pitches up and stalls.
+  - Cambered wings on a car unload the tyres on flat ground, so it loses drive (that's why `winged_buggy` uses flat wings).
+  - Planes use `air_propeller` (air 1, water 0.3) for push in the air. Godot's default linear damping (0.1/s) is a hidden drag of about 600 N at flying speed.
 - **Water:** per part, `submerged_at(point, height)` gives buoyancy at the part's centre of mass, scaled by its shape's height, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. That includes cargo on a flat plate (it slides off on the first turn); trays hold it with their rims. Air drag is quadratic.
 - **Fuel:** `fuel` drains by `fuel_use × |throttle| × delta`. At 0 the power budget is off: no wheel drive or propeller push. `Vehicle.fuel_for(defs)` sums the numbers and the garage uses it too. A new Vehicle starts full, so respawn, restart and garage all refill. (Burn follows the throttle, not the power actually used.)
@@ -112,7 +118,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|buggy_tank> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power\|airprop\|fuel>` | no |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|buggy_tank\|winged_buggy\|plane\|res://path.json> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power\|airprop\|fuel\|jump\|fly>` | no |
 | Garage clicks (mirror mode, thin parts, ...) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Mission, carrying | same, with `-- res://tests/blueprints/carrier.json carry`: puts the crate in the trays at the start, fails if it isn't still in them at the finish (expect gold, about 9.9 s) | no |
@@ -153,7 +159,7 @@ Presets live in `tests/screenshot_presets.json`. Each one loads its scene fresh.
 | `action` | Scripted action run before simulating. Right now: `deliver_cargo` (drops the mission cargo into the goal; `mission_time` sets the clock shown). |
 | `seconds` | How long to simulate before the shot. |
 
-The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
+The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `garage_plane`, `plane_flying`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
 
 **Colours look flatter than on real hardware.** Under xvfb, Godot runs the Compatibility (OpenGL) renderer on llvmpipe (software rendering): no Forward+ lighting, weaker shading, and distant ground washes out in the fog. Judge layout, framing, UI and presence of objects, not exact colour or lighting quality.
 

@@ -35,6 +35,8 @@ DRIVE_SCENARIOS=(
 	"buggy airprop"
 	"buggy fuel"
 	"buggy_tank fuel"
+	"winged_buggy jump"
+	"plane fly"
 )
 
 names=()

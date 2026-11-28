@@ -46,6 +46,10 @@ static func create(id: String, def: Dictionary) -> Node3D:
 			root.add_child(box(Vector3(0.9, 0.8, 0.2), Vector3(0, 0.05, 0.35), color))
 		"float":
 			root.add_child(cylinder(0.45, 0.95, color, Vector3(PI / 2, 0, 0)))
+		"wing", "flat_wing":
+			# A thin board with a rounder front edge. (It still collides like a full cube.)
+			root.add_child(box(Vector3(0.98, 0.08, 0.98), Vector3(0, -0.2, 0), color))
+			root.add_child(cylinder(0.06, 0.98, color, Vector3(0, 0, PI / 2), Vector3(0, -0.2, -0.46)))
 		"engine":
 			root.add_child(box(Vector3(0.9, 0.7, 0.9), Vector3(0, -0.15, 0), color))
 			root.add_child(cylinder(0.08, 0.5, Color("#333333"), Vector3.ZERO, Vector3(0.25, 0.35, 0.3)))

@@ -4,7 +4,7 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power", "airprop", "fuel"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power", "airprop", "fuel", "jump", "fly"]
 # "power": swims the 2-propeller Amphibian, then a 6-propeller copy with the same ONE
 # engine, down the pond. The power budget means 6 propellers mustn't be much faster.
 const POWER_BLUEPRINTS := ["res://data/blueprints/amphibian.json", "res://tests/blueprints/six_propellers.json"]
@@ -12,8 +12,17 @@ const POWER_SWAP_FRAME := 300 # each one swims for 5 s
 # "airprop": on dry land, a wheel-less sled with an air propeller must slide along,
 # and the same sled with a water propeller must not move (it only pushes in water).
 const AIRPROP_BLUEPRINTS := ["res://tests/blueprints/air_sled.json", "res://tests/blueprints/water_sled.json"]
-const VEHICLES := ["buggy", "amphibian", "forklift", "buggy_tank"]
+const VEHICLES := ["buggy", "amphibian", "forklift", "buggy_tank", "winged_buggy", "plane"]
+const BLUEPRINTS := {
+	"amphibian": "res://data/blueprints/amphibian.json",
+	"forklift": "res://tests/blueprints/forklift.json",
+	"winged_buggy": "res://tests/blueprints/winged_buggy.json",
+	"plane": "res://data/blueprints/plane.json",
+	"buggy_tank": "res://tests/blueprints/buggy_tank.json",
+}
 const FRAMES := 600
+const JUMP_FRAMES := 1500 # the jump scenario can do two jumps, then stops early
+const RAMP_TOP_Z := -42.0 # past here on the jump ramp, losing the ground means we jumped
 
 var main: Node
 var frame := 0
@@ -35,6 +44,13 @@ const FUEL_RESERVE := 2.0 # "fuel" scenario: a tiny seat reserve, so a tankless 
 var fuel_start := 0.0
 var fuel_out_at := -1.0 # seconds when the fuel hit zero (-1 = never)
 var top_speed_seen := 0.0
+var max_height := -INF
+# Jump scenario: a vehicle with wings first watches a plain buggy jump, to compare.
+var jump_runs: Array[Dictionary] = [] # {name, distance, height} per finished jump
+var jump_start := 0 # frame this jump's run-up started
+var takeoff := Vector3.INF # where the wheels left the ramp
+var airborne := 0 # frames in the air so far
+var jump_top := -INF
 
 
 func _initialize() -> void:
@@ -43,17 +59,16 @@ func _initialize() -> void:
 		vehicle_arg = args[0]
 	if args.size() > 1:
 		scenario = args[1]
-	if vehicle_arg not in VEHICLES or scenario not in SCENARIOS:
+	# A blueprint path works too (handy for trying out a new design): res://... or user://...
+	var is_path := vehicle_arg.ends_with(".json")
+	if (vehicle_arg not in VEHICLES and not is_path) or scenario not in SCENARIOS:
 		printerr("FAIL unknown vehicle or scenario: %s %s (vehicles: %s, scenarios: %s)" % [vehicle_arg, scenario, VEHICLES, SCENARIOS])
 		quit(1)
 		return
 	main = load("res://world/test_map.tscn").instantiate()
-	if vehicle_arg == "amphibian":
-		main.blueprints.assign(["res://data/blueprints/amphibian.json"])
-	if vehicle_arg == "forklift":
-		main.blueprints.assign(["res://tests/blueprints/forklift.json"])
-	if vehicle_arg == "buggy_tank":
-		main.blueprints.assign(["res://tests/blueprints/buggy_tank.json"])
+	if BLUEPRINTS.has(vehicle_arg) or is_path:
+		# The test map spawns the first one. The buggy comes second, for comparing jumps.
+		main.blueprints.assign([BLUEPRINTS.get(vehicle_arg, vehicle_arg), "res://data/blueprints/buggy.json"])
 	root.add_child(main)
 	print("physics engine: ", ProjectSettings.get_setting("physics/3d/physics_engine"))
 
@@ -98,6 +113,12 @@ func _physics_process(_delta: float) -> bool:
 			v.fuel_capacity = FUEL_RESERVE
 			v.fuel = FUEL_RESERVE
 		fuel_start = v.fuel
+		if scenario == "fly":
+			# The long open runway along the east side of the map, heading north.
+			v.global_transform = Transform3D(Basis.IDENTITY, Vector3(100, 1, 110))
+		if scenario == "jump" and vehicle_arg != "buggy":
+			main.spawn_vehicle(1) # the plain buggy jumps first
+			v = main.vehicle
 		start_pos = v.global_position
 		last_heading = _heading(v)
 	match scenario:
@@ -134,8 +155,17 @@ func _physics_process(_delta: float) -> bool:
 			if fuel_out_at < 0.0 and v.fuel <= 0.0:
 				fuel_out_at = frame / 60.0
 			top_speed_seen = maxf(top_speed_seen, v.speed_kmh())
+		"fly":
+			if frame > 30: Input.action_press("accelerate")
+		"jump":
+			if frame - jump_start > 30: Input.action_press("accelerate")
+			if _track_jump(v):
+				return _finish()
+			v = main.vehicle # may have swapped from the buggy to the vehicle under test
 	if scenario == "straight" and frame % 30 == 0:
 		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
+	if frame > 2:
+		max_height = maxf(max_height, v.global_position.y)
 	min_upright = minf(min_upright, v.global_basis.y.y)
 	if frame > 2:
 		var h := _heading(v)
@@ -147,18 +177,24 @@ func _physics_process(_delta: float) -> bool:
 		crate_worst_ahead = maxf(crate_worst_ahead, ahead)
 		crate_closest_ahead = minf(crate_closest_ahead, ahead)
 		crate_worst_side = maxf(crate_worst_side, absf(to_crate.dot(v.global_basis.x)))
-	if frame % 30 == 0:
+	if frame % (10 if scenario == "jump" and takeoff != Vector3.INF else 30) == 0:
 		var up := v.global_basis.y
 		var grounded := v.wheels.filter(func(w): return w.grounded).size()
 		var heading := _heading(v)
-		print("t=%4.1fs pos=(%6.1f %5.2f %6.1f) speed=%5.1f km/h upright=%.2f wheels_down=%d heading=%4.0f" % [
+		# pitch: + = nose up. roll: + = leaning right. (degrees)
+		var pitch := rad_to_deg(asin(clampf(-v.global_basis.z.y, -1.0, 1.0)))
+		var roll := rad_to_deg(asin(clampf(-v.global_basis.x.y, -1.0, 1.0)))
+		print("t=%4.1fs pos=(%6.1f %5.2f %6.1f) speed=%5.1f km/h upright=%.2f pitch=%3.0f roll=%3.0f wheels_down=%d heading=%4.0f" % [
 			frame / 60.0, v.global_position.x, v.global_position.y, v.global_position.z,
-			v.speed_kmh(), up.y, grounded, heading])
+			v.speed_kmh(), up.y, pitch, roll, grounded, heading])
 		if scenario == "fuel":
 			print("        fuel=%.2f / %.0f" % [v.fuel, v.fuel_capacity])
 		if crate:
 			print("        crate=(%6.1f %5.2f %6.1f) %.1f m ahead" % [crate.position.x, crate.position.y, crate.position.z, (crate.position - v.global_position).dot(-v.global_basis.z)])
-	if frame == FRAMES:
+	if scenario == "jump" and frame >= JUMP_FRAMES:
+		check(false, "finished both jumps within %d frames" % JUMP_FRAMES)
+		return _finish()
+	if frame == FRAMES and scenario != "jump":
 		print("min upright: %.2f  %s" % [min_upright, "FLIPPED" if min_upright < 0.3 else "stayed upright"])
 		_check_expectations(v)
 		return _finish()
@@ -182,6 +218,40 @@ func _swap_vehicle(old: Vehicle, path: String, at: Vector3) -> Vehicle:
 
 func _flat_distance(v: Vehicle) -> float:
 	return Vector2(v.global_position.x - start_pos.x, v.global_position.z - start_pos.z).length()
+## Jump scenario: watches for the wheels leaving the jump ramp and landing again.
+## Returns true when every jump is done (and checks have run).
+func _track_jump(v: Vehicle) -> bool:
+	var grounded := v.wheels.filter(func(w): return w.grounded).size()
+	if takeoff == Vector3.INF:
+		if grounded == 0 and v.global_position.z < RAMP_TOP_Z:
+			takeoff = v.global_position
+			print("        %s took off at %.1f km/h" % [v.blueprint_name, v.speed_kmh()])
+		return false
+	jump_top = maxf(jump_top, v.global_position.y)
+	airborne += 1
+	if grounded == 0 or airborne < 10:
+		return false
+	var d := Vector2(v.global_position.x - takeoff.x, v.global_position.z - takeoff.z).length()
+	jump_runs.append({"name": v.blueprint_name, "distance": d, "height": jump_top - takeoff.y})
+	print("        %s landed: jumped %.1f m, %.1f m above the ramp top, %.1f s in the air" % [v.blueprint_name, d, jump_top - takeoff.y, airborne / 60.0])
+	var want := 1 if vehicle_arg == "buggy" else 2
+	if jump_runs.size() < want:
+		# Now the vehicle under test, from the same start.
+		Input.action_release("accelerate")
+		main.spawn_vehicle(0)
+		jump_start = frame
+		takeoff = Vector3.INF
+		airborne = 0
+		jump_top = -INF
+		return false
+	print("min upright: %.2f" % min_upright)
+	check(min_upright > 0.5, "didn't flip on the jump (min upright %.2f > 0.5)" % min_upright)
+	if want == 2:
+		var plain: float = jump_runs[0].distance
+		var winged: float = jump_runs[1].distance
+		check(winged >= plain * 1.3, "%s jumped at least 30%% further than the plain buggy (%.1f m vs %.1f m, %+.0f%%)" % [
+			jump_runs[1].name, winged, plain, (winged / plain - 1.0) * 100.0])
+	return true
 
 
 ## 0 = north, +90 = west (turned left).
@@ -193,9 +263,14 @@ func _heading(v: Vehicle) -> float:
 func _check_expectations(v: Vehicle) -> void:
 	var moved := Vector2(v.global_position.x - start_pos.x, v.global_position.z - start_pos.z).length()
 	print("travelled %.1f m, turned %.0f deg" % [moved, turned])
-	# Every scenario: nothing should tip over.
-	check(min_upright > 0.8, "stayed upright (min upright %.2f > 0.8)" % min_upright)
+	# Every scenario: nothing should tip over. Planes may bank and pitch a bit more.
+	var upright_min := 0.5 if scenario == "fly" else 0.8
+	check(min_upright > upright_min, "stayed upright (min upright %.2f > %.1f)" % [min_upright, upright_min])
 	match scenario:
+		"fly":
+			var climb := v.global_position.y - start_pos.y
+			print("height: start %.1f m, highest %.1f m, end %.1f m" % [start_pos.y, max_height, v.global_position.y])
+			check(climb >= 5.0, "took off and climbed at least 5 m by itself (%.1f m)" % climb)
 		"straight":
 			check(moved >= 60.0, "travelled at least 60 m (%.1f m)" % moved)
 			if vehicle_arg == "buggy":
