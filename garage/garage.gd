@@ -141,7 +141,10 @@ func mirror_cell(cell: Vector3i) -> Vector3i:
 
 ## A mirror swaps left and right, so a part turned to face left (1) faces right (3) in
 ## the mirror. Facing forward (0) or backward (2) stays the same.
+## Anything above 3 (e.g. pointing down or up) has no left or right, so it stays too.
 static func mirror_rot(r: int) -> int:
+	if r < 0 or r > 3:
+		return r
 	return (4 - r) % 4
 
 

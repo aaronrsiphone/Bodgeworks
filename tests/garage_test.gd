@@ -55,7 +55,8 @@ func _process(_delta: float) -> bool:
 		_select_key(KEY_1) # block
 	if frame == 125:
 		check(garage.mirror_on and garage.mirror_x2 == 1, "M turned mirror on with the line at x = 0.5 (x2 = %d)" % garage.mirror_x2)
-		check(garage.mirror_rot(1) == 3 and garage.mirror_rot(3) == 1 and garage.mirror_rot(0) == 0, "mirrored rotation swaps left and right")
+		check(garage.mirror_rot(1) == 3 and garage.mirror_rot(3) == 1 and garage.mirror_rot(0) == 0 and garage.mirror_rot(2) == 2, "mirrored rotation swaps left and right")
+		check(garage.mirror_rot(4) == 4 and garage.mirror_rot(5) == 5, "rotations without a left or right (4, 5) stay the same")
 		# Fill the gap between the left wheels so (-2,0,1) has something to touch.
 		garage.build_at(Vector3i(-1, 0, 1))
 		check(garage.parts.has(Vector3i(-1, 0, 1)) and garage.parts.has(Vector3i(2, 0, 1)), "mirror placed a twin at (2,0,1)")
