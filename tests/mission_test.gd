@@ -1,6 +1,7 @@
 extends SceneTree
 ## An autopilot plays Special Delivery: drives through waypoints around the pond
-## pushing the crate, and reports the time and medal.
+## pushing the crate, and reports the time and medal. Exits 1 if it doesn't
+## finish within 90 s, or finishes slower than silver.
 ## godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json
 
 const ROUTE := [Vector2(14, -10), Vector2(18, 12), Vector2(25, 20), Vector2(55, 20), Vector2(63, 12), Vector2(85, -10)]
@@ -41,6 +42,10 @@ func _physics_process(_delta: float) -> bool:
 	frame += 1
 	var main := current_scene
 	if main == null or main.get("vehicle") == null or main.mission == null:
+		if frame > 600:
+			print("RESULT mission %s: FAIL  the mission never started" % path.get_file())
+			quit(1)
+			return true
 		return false
 	var v: Vehicle = main.vehicle
 	var m = main.mission
@@ -51,10 +56,15 @@ func _physics_process(_delta: float) -> bool:
 	if m.finished and (shot_dir == "" or frame >= done_frame + 30):
 		if shot_dir != "":
 			root.get_viewport().get_texture().get_image().save_png(shot_dir.path_join("mission_02_delivered.png"))
-		print("RESULT %s finished at %s  tier=%s  crate=%s" % [path.get_file(), game.format_time(m.time), game.tier_for(m.time, m.gold_time, m.silver_time, m.bronze_time), m.cargo.global_position])
+		var tier: String = game.tier_for(m.time, m.gold_time, m.silver_time, m.bronze_time)
+		var ok := tier == "gold" or tier == "silver"
+		print("RESULT mission %s: %s  finished at %s  tier=%s (silver is %s)  crate=%s" % [path.get_file(), "PASS" if ok else "FAIL",
+			game.format_time(m.time), tier, game.format_time(m.silver_time), m.cargo.global_position])
+		quit(0 if ok else 1)
 		return true
 	if frame > 60 * 90:
-		print("RESULT %s TIMEOUT after 90 s, crate at %s, vehicle at %s" % [path.get_file(), m.cargo.global_position, v.global_position])
+		print("RESULT mission %s: FAIL  TIMEOUT after 90 s, crate at %s, vehicle at %s" % [path.get_file(), m.cargo.global_position, v.global_position])
+		quit(1)
 		return true
 
 	var pos := Vector2(v.global_position.x, v.global_position.z)

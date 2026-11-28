@@ -1,6 +1,6 @@
 extends SceneTree
 ## Clicks around the garage like a player would, then test drives the result.
-## Needs a display (mouse picking): run with xvfb-run on a server.
+## Needs a display (mouse picking): run with xvfb-run on a server. Exits 1 if any check fails.
 ## godot --path . --rendering-method gl_compatibility --script res://tests/garage_test.gd -- out_dir
 
 var garage: Node
@@ -48,7 +48,12 @@ func _process(_delta: float) -> bool:
 		_key(KEY_G)
 	if frame == 120:
 		check(current_scene.name == "Garage" and current_scene.parts.size() == 14, "G went back to the garage with the build kept")
-		print("RESULT: %s" % ("PASS" if failures == 0 else "%d FAILED" % failures))
+		print("RESULT garage: %s" % ("PASS" if failures == 0 else "FAIL (%d)" % failures))
+		quit(1 if failures > 0 else 0)
+		return true
+	if frame > 600:
+		check(false, "finished within 600 frames (stuck at frame %d)" % frame)
+		quit(1)
 		return true
 	return false
 
