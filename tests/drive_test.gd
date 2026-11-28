@@ -4,7 +4,14 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "fuel"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power", "airprop", "fuel"]
+# "power": swims the 2-propeller Amphibian, then a 6-propeller copy with the same ONE
+# engine, down the pond. The power budget means 6 propellers mustn't be much faster.
+const POWER_BLUEPRINTS := ["res://data/blueprints/amphibian.json", "res://tests/blueprints/six_propellers.json"]
+const POWER_SWAP_FRAME := 300 # each one swims for 5 s
+# "airprop": on dry land, a wheel-less sled with an air propeller must slide along,
+# and the same sled with a water propeller must not move (it only pushes in water).
+const AIRPROP_BLUEPRINTS := ["res://tests/blueprints/air_sled.json", "res://tests/blueprints/water_sled.json"]
 const VEHICLES := ["buggy", "amphibian", "forklift", "buggy_tank"]
 const FRAMES := 600
 
@@ -21,10 +28,14 @@ var crate_worst_ahead := -INF # from 2 s on, how far ahead the crate got at most
 var crate_closest_ahead := INF # ...and how close (negative = behind the vehicle)
 var crate_worst_side := 0.0 # ...and how far off to the side
 var failures := 0
+var speed_samples: Array[Vector2] = [] # (time s, forward distance m), for straight's cruise speed
+var power_top_kmh := [0.0, 0.0] # top swim speed of each "power" blueprint
+var sled_moved := [0.0, 0.0] # how far each "airprop" sled got (m)
 const FUEL_RESERVE := 2.0 # "fuel" scenario: a tiny seat reserve, so a tankless buggy runs dry fast
 var fuel_start := 0.0
 var fuel_out_at := -1.0 # seconds when the fuel hit zero (-1 = never)
 var top_speed_seen := 0.0
+var driving_frames := 0 # frames with the throttle down and a wheel on the ground (in the air burns nothing)
 
 
 func _initialize() -> void:
@@ -56,6 +67,13 @@ func _physics_process(_delta: float) -> bool:
 	if v == null:
 		check(false, "the test map spawned a vehicle")
 		return _finish()
+	if scenario == "power" and (frame == 2 or frame == POWER_SWAP_FRAME):
+		v = _swap_vehicle(v, POWER_BLUEPRINTS[0 if frame == 2 else 1], Vector3(40, 0, 8))
+	if scenario == "airprop" and (frame == 2 or frame == POWER_SWAP_FRAME):
+		if frame == POWER_SWAP_FRAME:
+			sled_moved[0] = _flat_distance(v)
+		# Open flat grass east of the start, heading north.
+		v = _swap_vehicle(v, AIRPROP_BLUEPRINTS[0 if frame == 2 else 1], Vector3(80, 1, 60))
 	if frame == 2:
 		print("vehicle: %s  mass %.0f kg  COM %s  inertia %s" % [v.blueprint_name, v.mass, v.center_of_mass, v.inertia])
 		if scenario == "pond":
@@ -106,11 +124,21 @@ func _physics_process(_delta: float) -> bool:
 		"swim":
 			if frame > 30: Input.action_press("accelerate")
 			if frame > 120: Input.action_press("steer_left")
+		"power":
+			Input.action_press("accelerate")
+			var which := 0 if frame < POWER_SWAP_FRAME else 1
+			power_top_kmh[which] = maxf(power_top_kmh[which], v.speed_kmh())
+		"airprop":
+			if frame > 30: Input.action_press("accelerate")
 		"fuel":
 			if frame > 60: Input.action_press("accelerate")
 			if fuel_out_at < 0.0 and v.fuel <= 0.0:
 				fuel_out_at = frame / 60.0
 			top_speed_seen = maxf(top_speed_seen, v.speed_kmh())
+			if frame > 60 and v.wheels.any(func(w): return w.grounded):
+				driving_frames += 1
+	if scenario == "straight" and frame % 30 == 0:
+		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
 	min_upright = minf(min_upright, v.global_basis.y.y)
 	if frame > 2:
 		var h := _heading(v)
@@ -130,7 +158,7 @@ func _physics_process(_delta: float) -> bool:
 			frame / 60.0, v.global_position.x, v.global_position.y, v.global_position.z,
 			v.speed_kmh(), up.y, grounded, heading])
 		if scenario == "fuel":
-			print("        fuel=%.2f / %.0f" % [v.fuel, v.fuel_capacity])
+			print("        fuel=%.2f / %.0f  engine load %.2f" % [v.fuel, v.fuel_capacity, v.engine_load])
 		if crate:
 			print("        crate=(%6.1f %5.2f %6.1f) %.1f m ahead" % [crate.position.x, crate.position.y, crate.position.z, (crate.position - v.global_position).dot(-v.global_basis.z)])
 	if frame == FRAMES:
@@ -138,6 +166,25 @@ func _physics_process(_delta: float) -> bool:
 		_check_expectations(v)
 		return _finish()
 	return false
+
+
+## "power" and "airprop": replace the map's vehicle with another blueprint at `at`,
+## facing north, and make it the one the controls drive.
+func _swap_vehicle(old: Vehicle, path: String, at: Vector3) -> Vehicle:
+	var v := Vehicle.new()
+	v.build(PartCatalog.load_blueprint(path))
+	v.transform = Transform3D(Basis.IDENTITY, at)
+	old.queue_free()
+	main.add_child(v)
+	main.vehicle = v
+	main.camera.target = v
+	start_pos = v.global_position
+	last_heading = _heading(v)
+	return v
+
+
+func _flat_distance(v: Vehicle) -> float:
+	return Vector2(v.global_position.x - start_pos.x, v.global_position.z - start_pos.z).length()
 
 
 ## 0 = north, +90 = west (turned left).
@@ -154,6 +201,25 @@ func _check_expectations(v: Vehicle) -> void:
 	match scenario:
 		"straight":
 			check(moved >= 60.0, "travelled at least 60 m (%.1f m)" % moved)
+			if vehicle_arg == "buggy":
+				# Cruise speed over the last 2 s. Before the power budget (issue #6) it was
+				# about 45 km/h; it should stay within 10% of that.
+				var a: Vector2 = speed_samples[speed_samples.size() - 5]
+				var b: Vector2 = speed_samples[speed_samples.size() - 1]
+				var cruise := (b.y - a.y) / (b.x - a.x) * 3.6
+				check(cruise > 40.5 and cruise < 50.0, "cruise speed within 10%% of 45 km/h (%.1f km/h)" % cruise)
+		"power":
+			var ratio: float = power_top_kmh[1] / maxf(power_top_kmh[0], 0.1)
+			print("top swim speed: 2 propellers %.1f km/h, 6 propellers %.1f km/h (x%.2f)" % [power_top_kmh[0], power_top_kmh[1], ratio])
+			check(power_top_kmh[0] > 22.0 and power_top_kmh[0] < 32.0, "Amphibian swims at 22-32 km/h (%.1f km/h)" % power_top_kmh[0])
+			check(ratio < 1.5, "6 propellers on one engine are less than 1.5x faster than 2 (x%.2f)" % ratio)
+		"airprop":
+			sled_moved[1] = moved
+			print("on land: air propeller sled moved %.1f m, water propeller sled %.1f m" % [sled_moved[0], sled_moved[1]])
+			check(sled_moved[0] >= 5.0, "air propeller pushes on land (%.1f m >= 5 m)" % sled_moved[0])
+			check(sled_moved[1] < 1.0, "water propeller does nothing on land (%.1f m < 1 m)" % sled_moved[1])
+			# Fuel follows power used: a propeller that can't push uses no power, so burns no fuel.
+			check(v.fuel == v.fuel_capacity, "water propeller on land burns no fuel (%.2f of %.0f left)" % [v.fuel, v.fuel_capacity])
 		"turn":
 			check(turned > 90.0, "turned left more than 90 deg (%.0f deg)" % turned)
 		"ramp":
@@ -165,7 +231,11 @@ func _check_expectations(v: Vehicle) -> void:
 			if v.has_tanks:
 				check(v.fuel > 0.0, "still has fuel after 9 s of full throttle (%.1f left)" % v.fuel)
 				var burned := fuel_start - v.fuel
-				check(absf(burned - 9.0 * v.fuel_use) < 0.5, "burned about %.1f fuel (%.1f)" % [9.0 * v.fuel_use, burned])
+				# Fuel follows power used: full throttle on the ground = full burn, but
+				# flying off the jump ramp (no wheels down) burns nothing.
+				var expected_burn := driving_frames / 60.0 * v.fuel_use
+				check(absf(burned - expected_burn) < 0.3, "burned about %.1f fuel, only while wheels were down (%.1f)" % [expected_burn, burned])
+				check(burned < 9.0 * v.fuel_use - 0.5, "burned less than 9 s worth, thanks to the air time (%.1f)" % burned)
 				check(speed > 30.0, "kept driving to the end (%.0f km/h > 30)" % speed)
 			else:
 				# Throttle goes down at t = 1 s, so the reserve should run dry at 1 + reserve / use.

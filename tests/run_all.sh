@@ -31,6 +31,8 @@ DRIVE_SCENARIOS=(
 	"amphibian ramp"
 	"amphibian swim"
 	"forklift push"
+	"amphibian power"
+	"buggy airprop"
 	"buggy fuel"
 	"buggy_tank fuel"
 )

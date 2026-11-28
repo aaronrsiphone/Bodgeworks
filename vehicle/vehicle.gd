@@ -7,11 +7,14 @@ extends RigidBody3D
 ## every physics tick each part pushes on the body at its own position:
 ##   wheels     -> raycast suspension, drive, grip
 ##   propellers -> thrust
+##   engines    -> a POWER budget that the wheels and propellers share
 ##   everything -> buoyancy and drag when it is under water
 ## Pushing at the part's position (not the middle) is what makes off-centre
 ## thrust turn you and heavy parts tip you.
 ##
-## Fuel: engines burn fuel while you hold the throttle (more throttle = more fuel).
+## Fuel: engines burn fuel for the power they actually deliver to wheels on the
+## ground and propellers that can push. Full throttle on the road = full burn;
+## wheels spinning in the air or a water propeller on dry land burn nothing.
 ## When the fuel runs out, wheels and propellers stop pushing. A new vehicle
 ## (respawn, mission restart, back to the garage) always starts with a full tank.
 
@@ -35,12 +38,13 @@ var blueprint_name := ""
 var parts: Array[Dictionary] = []
 var wheels: Array[Dictionary] = []
 var thrusters: Array[Dictionary] = []
-var engine_force := 0.0
-var top_speed := 0.0
+var engine_force := 0.0 # the most push all engines together give at a standstill (N)
+var engine_power := 0.0 # how much push they can keep up as you go faster (W = N x m/s)
 var has_seat := false
 var fuel := 0.0 # fuel left
 var fuel_capacity := 0.0 # fuel when full
-var fuel_use := 0.0 # fuel burned per second at full throttle (all engines together)
+var fuel_use := 0.0 # fuel burned per second at full power (all engines together)
+var engine_load := 0.0 # how much of the engine power is being used right now (0..1)
 var has_tanks := false # false = running on the little reserve under the seat
 
 var _steer_angle := 0.0
@@ -121,7 +125,7 @@ func build(blueprint: Dictionary) -> void:
 
 	if not has_seat:
 		push_warning("'%s' has no seat, so nobody can drive it." % blueprint_name)
-	if engine_force == 0.0:
+	if engine_power == 0.0:
 		push_warning("'%s' has no engine, so wheels and propellers won't push." % blueprint_name)
 
 
@@ -141,6 +145,8 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 			"visual": visual,
 			"spin": 0.0,
 			"grounded": false,
+			"hit": {},
+			"ray_from": Vector3.ZERO,
 		})
 		return # wheels touch the ground with rays, not collision boxes
 
@@ -164,11 +170,13 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 		has_seat = true
 	if def.has("engine"):
 		engine_force += float(def.engine.force)
-		top_speed = max(top_speed, float(def.engine.get("top_speed", 25)))
+		engine_power += float(def.engine.get("power", 0))
 	if def.has("thrust"):
 		p["thrust"] = float(def.thrust.force)
 		p["swivel"] = deg_to_rad(float(def.thrust.get("steer", 0)))
 		p["air"] = float(def.thrust.get("air", 1.0))
+		p["water"] = float(def.thrust.get("water", 1.0))
+		p["grip"] = 0.0 # how well it can push right now, set every tick
 		thrusters.append(p)
 
 
@@ -179,60 +187,104 @@ func _physics_process(delta: float) -> void:
 	var forward := -global_basis.z
 	var com_global := to_global(center_of_mass)
 	var speed := linear_velocity.dot(forward)
-	var powered := engine_force > 0.0 and has_seat and fuel > 0.0
-	if powered:
-		# Burn fuel in proportion to how hard you press the throttle.
-		fuel = maxf(fuel - fuel_use * absf(throttle) * delta, 0.0)
-
-	# Engines give less push as you approach top speed.
-	var taper := 1.0
-	if powered and signf(throttle) == signf(speed):
-		taper = clampf(1.0 - absf(speed) / top_speed, 0.0, 1.0)
+	var powered := engine_power > 0.0 and has_seat and fuel > 0.0 # no fuel = no push
 
 	# Steering: less lock at high speed so you don't flip instantly.
 	var max_steer := deg_to_rad(32.0) / (1.0 + absf(speed) * 0.06)
 	_steer_angle = move_toward(_steer_angle, steer * max_steer, delta * 2.5)
 
-	_apply_wheels(delta, up, com_global, taper if powered else 0.0)
+	# --- The power budget ---
+	# Power = push x speed. So the faster you go, the less push the engines can
+	# give, and at some speed that push only just beats drag: that's your top speed.
+	# At low speed the push is capped at engine_force so you don't launch off.
+	var drive_total := 0.0
+	if powered and throttle != 0.0:
+		# Pushing against the way you're moving (braking with reverse) gets full push.
+		var going_with := absf(speed) if signf(throttle) == signf(speed) else 0.0
+		drive_total = minf(engine_force, engine_power / maxf(going_with, 0.1)) * throttle
+
+	# Every wheel on the ground and every propeller shares that one budget,
+	# so ten propellers on one engine don't give ten times the push.
+	# A propeller's share ("weight") is how well it can push right now:
+	# its "water" number under water, its "air" number out of the water.
+	# A water propeller is (air 0, water 1); an air propeller is the other way round.
+	var weight_total := 0.0
+	for w in wheels:
+		w.grounded = _wheel_ray(w).size() > 0
+		if w.grounded:
+			weight_total += 1.0
+	for t in thrusters:
+		t.grip = lerpf(t.air, t.water, submerged_at(to_global(t.pos)))
+		weight_total += t.grip
+	var push_per_weight := drive_total / weight_total if weight_total > 0.0 else 0.0
+
+	var delivered := 0.0 # push (N) that actually goes somewhere, added up below
+	for w in wheels:
+		if w.grounded:
+			delivered += absf(push_per_weight)
+	_apply_wheels(delta, up, com_global, push_per_weight)
 
 	# Propellers push along their facing direction, at their position.
 	# They swivel when you steer, like an outboard motor. One behind the middle
 	# swivels the opposite way to one in front, so steering always turns the right way.
 	for t in thrusters:
 		var at := to_global(t.pos)
-		# Full push under water, only a fraction ("air" in parts.json) in the air.
-		var grip: float = lerpf(t.air, 1.0, submerged_at(at))
-		var push: float = t.thrust * grip * throttle * (taper if powered else 0.0)
+		# Its share of the power, but never more than the propeller itself can push
+		# ("force" in parts.json), times how well it works where it is (air or water).
+		var cap: float = t.thrust * t.grip
+		var push: float = clampf(push_per_weight * t.grip, -cap, cap)
 		var behind: bool = t.pos.z > center_of_mass.z
 		var swivel: float = t.swivel * steer * (-1.0 if behind else 1.0)
 		var aim: Basis = Basis(Vector3.UP, swivel) * t.basis
 		t.root.basis = aim
 		var dir: Vector3 = global_basis * (aim * Vector3.FORWARD)
 		apply_force(dir * push, at - global_position)
+		delivered += absf(push)
 		if t.has("spinner"):
 			t.spinner.rotate_z(throttle * delta * 25.0 if powered else 0.0)
+
+	_burn_fuel(delta, delivered, speed, throttle)
 
 	_apply_water(com_global)
 	apply_central_force(-linear_velocity * linear_velocity.length() * AIR_DRAG)
 
 
-func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive: float) -> void:
+## Fuel burns in proportion to the power used: power = push x speed.
+## Below the "knee" speed (engine_power / engine_force) the engines are capped by
+## force, not power, but they're still working flat out, so we count them as full power.
+func _burn_fuel(delta: float, delivered: float, speed: float, throttle_now: float) -> void:
+	engine_load = 0.0
+	if engine_power <= 0.0 or fuel <= 0.0 or delivered <= 0.0:
+		return
+	var knee := engine_power / maxf(engine_force, 1.0)
+	var going_with := absf(speed) if signf(throttle_now) == signf(speed) else 0.0
+	engine_load = clampf(delivered * maxf(going_with, knee) / engine_power, 0.0, 1.0)
+	fuel = maxf(fuel - fuel_use * engine_load * delta, 0.0)
+
+
+## Casts the wheel's suspension ray. Returns the hit (empty if the wheel is in the air).
+func _wheel_ray(w: Dictionary) -> Dictionary:
+	var up := global_basis.y
+	var from := to_global(w.pos) + up * 0.5 # start a bit high so we still hit after a hard landing
+	var reach: float = 0.5 + w.radius + w.travel
+	var query := PhysicsRayQueryParameters3D.create(from, from - up * reach)
+	query.collision_mask = LAYER_WORLD # wheels ride on the ground, never on crates
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	w.hit = hit
+	w.ray_from = from
+	return hit
+
+
+## drive_per_wheel: each grounded wheel's share of the engine push (N).
+func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive_per_wheel: float) -> void:
 	if wheels.is_empty():
 		return
-	var space := get_world_3d().direct_space_state
 	var mass_per_wheel := mass / wheels.size()
-	var drive_per_wheel := engine_force * throttle * drive / wheels.size()
 
 	for w in wheels:
-		var mount := to_global(w.pos)
-		var from := mount + up * 0.5 # start a bit high so we still hit after a hard landing
-		var reach: float = 0.5 + w.radius + w.travel
-		var query := PhysicsRayQueryParameters3D.create(from, from - up * reach)
-		query.collision_mask = LAYER_WORLD # wheels ride on the ground, never on crates
-		var hit := space.intersect_ray(query)
-
+		var hit: Dictionary = w.hit # cast at the start of this tick
+		var from: Vector3 = w.ray_from
 		var dist_from_mount: float = w.radius + w.travel
-		w.grounded = not hit.is_empty()
 		if w.grounded:
 			dist_from_mount = from.distance_to(hit.position) - 0.5
 			var contact: Vector3 = hit.position
@@ -262,7 +314,7 @@ func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive: float)
 			apply_force(tyre, axle - global_position)
 
 			w.spin -= v_long / w.radius * delta
-		elif absf(throttle) > 0.0 and drive > 0.0:
+		elif absf(throttle) > 0.0 and engine_power > 0.0 and has_seat:
 			w.spin -= throttle * 20.0 * delta # spin in the air for fun
 
 		# Wheel visuals follow the suspension, steering and rolling.
@@ -333,7 +385,7 @@ static func fuel_for(defs: Array) -> Dictionary:
 	return {"capacity": capacity, "use": use, "tanks": tanks}
 
 
-## How many seconds of full throttle the fuel lasts (INF if the engines burn nothing).
+## How many seconds of full power the fuel lasts (INF if the engines burn nothing).
 static func fuel_seconds(capacity: float, use: float) -> float:
 	return INF if use <= 0.0 else capacity / use
 
