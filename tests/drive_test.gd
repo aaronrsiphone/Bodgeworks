@@ -129,13 +129,13 @@ func _physics_process(_delta: float) -> bool:
 			power_top_kmh[which] = maxf(power_top_kmh[which], v.speed_kmh())
 		"airprop":
 			if frame > 30: Input.action_press("accelerate")
-	if scenario == "straight" and frame % 30 == 0:
-		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
 		"fuel":
 			if frame > 60: Input.action_press("accelerate")
 			if fuel_out_at < 0.0 and v.fuel <= 0.0:
 				fuel_out_at = frame / 60.0
 			top_speed_seen = maxf(top_speed_seen, v.speed_kmh())
+	if scenario == "straight" and frame % 30 == 0:
+		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
 	min_upright = minf(min_upright, v.global_basis.y.y)
 	if frame > 2:
 		var h := _heading(v)
