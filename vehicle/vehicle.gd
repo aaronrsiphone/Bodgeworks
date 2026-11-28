@@ -7,6 +7,7 @@ extends RigidBody3D
 ## every physics tick each part pushes on the body at its own position:
 ##   wheels     -> raycast suspension, drive, grip
 ##   propellers -> thrust
+##   wings      -> lift and drag from the air flowing over them
 ##   everything -> buoyancy and drag when it is under water
 ## Parts wired to an accessory button (1/2/3) also do something when it's pressed:
 ##   springs    -> kick the ground or a crate
@@ -23,6 +24,12 @@ const AIR_DRAG := 0.4
 const WATER_DRAG_UP := 300.0 # strong: stops bobbing and bouncing out
 const WATER_DRAG_FORWARD := 40.0 # weak: so propellers can push you along
 const WATER_DRAG_SIDE := 200.0 # like a keel: you carve turns instead of sliding sideways
+# Wings (per-wing numbers like area and stall angle live in data/parts.json).
+const AIR_DENSITY := 10.0 # kg per m3. Real air is 1.2; ours is much thicker so heavy wooden planes can fly.
+const WING_SLOPE := 5.0 # how fast lift grows as the nose tips up (per radian, about 0.09 per degree)
+const WING_DRAG := 0.02 # drag of the wing slicing edge-on through the air
+const WING_INDUCED := 0.05 # extra drag that comes with making lift (lift is never free)
+const WING_STALLED := 0.8 # lift after a stall, like a flat board held in the wind
 
 # Set these from outside (the player's controls).
 var throttle := 0.0 # -1 reverse .. +1 forward
@@ -33,6 +40,7 @@ var blueprint_name := ""
 var parts: Array[Dictionary] = []
 var wheels: Array[Dictionary] = []
 var thrusters: Array[Dictionary] = []
+var wings: Array[Dictionary] = []
 var engine_force := 0.0
 var top_speed := 0.0
 var has_seat := false
@@ -161,6 +169,12 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 		p["swivel"] = deg_to_rad(float(def.thrust.get("steer", 0)))
 		p["air"] = float(def.thrust.get("air", 1.0))
 		thrusters.append(p)
+	if def.has("wing"):
+		p["area"] = float(def.wing.get("area", 1.0))
+		p["lift"] = float(def.wing.get("lift", 1.0))
+		p["stall"] = deg_to_rad(float(def.wing.get("stall", 15)))
+		p["camber"] = float(def.wing.get("camber", 0.0))
+		wings.append(p)
 	if def.has("spring"):
 		p["cooldown_left"] = 0.0 # seconds until it can kick again
 		p["kick_time"] = 99.0 # seconds since it last kicked (drives the animation)
@@ -298,6 +312,7 @@ func _physics_process(delta: float) -> void:
 		if t.has("spinner"):
 			t.spinner.rotate_z(throttle * delta * 25.0 if powered else 0.0)
 
+	_apply_wings(com_global)
 	_apply_water(com_global)
 	apply_central_force(-linear_velocity * linear_velocity.length() * AIR_DRAG)
 
@@ -355,6 +370,46 @@ func _apply_wheels(delta: float, up: Vector3, com_global: Vector3, drive: float)
 		var vis: Node3D = w.visual
 		vis.position = w.pos - Vector3.UP * (dist_from_mount - w.radius)
 		vis.basis = Basis(Vector3.UP, _steer_angle if w.steers else 0.0) * Basis(Vector3.RIGHT, w.spin)
+
+
+## Wings: lift and drag from the air flowing over each wing, pushed at the wing's
+## own position. So wings in front of the middle lift the nose, wings at the back
+## (a tail) keep the nose pointing where you're going, like the feathers on a dart.
+func _apply_wings(com_global: Vector3) -> void:
+	for wg in wings:
+		var at := to_global(wg.pos)
+		# Air only: under water the wing just acts like any other part (water drag).
+		var dry := 1.0 - submerged_at(at)
+		# How fast this wing moves through the air. Spinning counts too, so a
+		# wing far from the middle feels more wind when you roll or pitch.
+		var vel := linear_velocity + angular_velocity.cross(at - com_global)
+		var speed := vel.length()
+		if dry <= 0.0 or speed < 0.5:
+			continue
+		var flow_dir := vel / speed # the way the wing moves (the air comes the other way)
+		var normal: Vector3 = global_basis * (wg.basis * Vector3.UP) # wings lie flat: up is out of the wing
+		# Angle of attack: how steeply the air hits the wing from below (+) or above (-).
+		var alpha := asin(clampf(-flow_dir.dot(normal), -1.0, 1.0))
+		var cl: float = _lift_coefficient(alpha, wg.stall, wg.camber) * wg.lift
+		# A flat board pushed sideways through the air has lots of drag (sin^2 part).
+		var cd: float = WING_DRAG + WING_INDUCED * cl * cl + sin(alpha) * sin(alpha)
+		var q: float = 0.5 * AIR_DENSITY * speed * speed * wg.area * dry # "wind pressure" on this wing
+		# Lift is at right angles to the airflow, on the wing's "up" side.
+		var lift_dir := normal - flow_dir * normal.dot(flow_dir)
+		var force: Vector3 = -flow_dir * q * cd
+		if lift_dir.length_squared() > 1e-6:
+			force += lift_dir.normalized() * q * cl
+		apply_force(force, at - global_position)
+
+
+## How much lift a wing makes at a given angle of attack (radians).
+## Rises in a straight line, until the stall angle: there the air stops
+## following the wing and most of the lift suddenly goes away.
+## camber is the lift it makes when perfectly level (a curved wing lifts even when flat).
+func _lift_coefficient(alpha: float, stall: float, camber: float) -> float:
+	if absf(alpha) <= stall:
+		return camber + WING_SLOPE * alpha
+	return WING_STALLED * sin(2.0 * alpha)
 
 
 ## How much of a one-cell part at this point is under water: 0 (dry) to 1 (fully under).

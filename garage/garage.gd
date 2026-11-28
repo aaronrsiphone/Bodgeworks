@@ -247,8 +247,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_update_ghost()
 		elif event.keycode == KEY_B:
 			set_wiring(not wiring)
-		elif event.keycode >= KEY_1 and event.keycode <= KEY_9:
-			var i: int = event.keycode - KEY_1
+		elif event.keycode >= KEY_0 and event.keycode <= KEY_9:
+			# 1-9 pick the first nine parts; 0 picks the tenth (like the keyboard's number row).
+			var i: int = 9 if event.keycode == KEY_0 else event.keycode - KEY_1
 			if i < part_ids.size():
 				_select(part_ids[i])
 		elif event.is_action("garage") or event.keycode == KEY_ENTER:
@@ -524,7 +525,8 @@ func _build_ui() -> void:
 	for i in part_ids.size():
 		var id := part_ids[i]
 		var def := PartCatalog.get_part(id)
-		var b := _button(bar, "%d  %s" % [i + 1, def.get("name", id)], _select.bind(id))
+		var key := str((i + 1) % 10) if i < 10 else "" # the 10th part is key 0; after that, click only
+		var b := _button(bar, ("%s  %s" % [key, def.get("name", id)]).strip_edges(), _select.bind(id))
 		b.toggle_mode = true
 		b.icon = PartVisuals.icon(def)
 		b.custom_minimum_size.y = 44

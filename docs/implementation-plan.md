@@ -16,12 +16,12 @@ This plan compares that baseline with `spec/architecture.md` and `spec/game-mech
 
 | Spec / architecture piece | Status | Issues |
 |---|---|---|
-| Part Catalog (data-driven) | Done: `data/parts.json`, including the Spring (#9) | thin parts #10, fuel #7, wing #8 |
+| Part Catalog (data-driven) | Done: `data/parts.json` | wing and flat wing done (#8), spring done (#9); thin parts #10, fuel #7 |
 | Blueprints (save, load, share) | Save and load done | sharing codes #29 |
 | Garage editor | Place, remove, rotate, undo, stats | mirror #5, gamepad #11, centre-of-mass/thrust visualisation #12, shop #22 |
 | Input Mapper (accessory buttons) | Done: buttons 1/2/3, garage wire mode, Spring part | #9 |
 | Vehicle Graph / Assembly Compiler | Implicit: one body per vehicle | explicit graph and islands #13 |
-| Force Model | Wheels, propellers (weak in air), water | power budget #6, wings #8 |
+| Force Model | Wheels, propellers (boat props weak in air, air props full strength), water, wings (#8) | power budget #6 |
 | Damage & Repair | Not started | #14, wrench #25 |
 | Joints (only where things move) | Not started | hinge and detacher #15 |
 | Rust core (gdext) | Deliberately deferred | measure first #16 |

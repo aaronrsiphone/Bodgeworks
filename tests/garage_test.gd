@@ -39,10 +39,10 @@ func _process(_delta: float) -> bool:
 		check(garage.why_not(Vector3i(0, 0, 1)) != "", "can't place inside an existing part")
 		_shot("garage_02_built.png")
 	if frame == 26:
-		_select_key(KEY_7) # spring
+		_select_key(KEY_0) # spring (the 10th part)
 		_click_cell_top(Vector3(1, 2, 2), MOUSE_BUTTON_LEFT) # on top of the propeller
 	if frame == 30:
-		check(garage.parts.get(Vector3i(1, 3, 2), {}).get("part") == "spring", "picked spring with key 7 and placed it")
+		check(garage.parts.get(Vector3i(1, 3, 2), {}).get("part") == "spring", "picked spring with key 0 and placed it")
 		_key(KEY_B) # wire mode
 		_click_cell_top(Vector3(1, 3, 2), MOUSE_BUTTON_LEFT) # spring: unwired -> button 1
 	if frame == 35:
