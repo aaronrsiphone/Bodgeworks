@@ -25,7 +25,7 @@ vehicle/vehicle.gd       Vehicle (RigidBody3D): compiles a blueprint into ONE bo
                          per-part forces each tick: wheels, propellers, buoyancy, drag. Core physics lives here.
 vehicle/part_catalog.gd  PartCatalog: loads parts/blueprints JSON, saves to user://blueprints, lists files
 vehicle/part_visuals.gd  PartVisuals: meshes per part (shared by garage and test map), icon()
-garage/garage.gd         garage editor: ghost placement, remove, rotate, undo, save/load, stats panel,
+garage/garage.gd         garage editor: ghost placement, remove, rotate, mirror mode (M), undo, save/load, stats panel,
                          missions list; UI is built in code (_build_ui)
 garage/garage_camera.gd  orbit camera (right-drag, scroll, middle-drag, Q/E and arrows)
 garage/garage.tscn       floor grid, light, FRONT arrow; parts go under the Build node
@@ -44,6 +44,7 @@ tests/                   headless/xvfb test scripts (see Testing)
 tests/blueprints/        test-only vehicles (forklift.json = pusher with forks)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
+docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
 docs/getting-started.md  player/dev guide: install, controls, garage, missions, editing parts/maps
 docs/implementation-plan.md  roadmap; each item links to a GitHub issue
 docs/.gdignore           keeps Godot from importing docs/
@@ -107,7 +108,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
 | Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim>` | no |
-| Garage clicks (10 checks) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
+| Garage clicks (22 checks, incl. mirror mode) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- <scene\|all> <out_dir> [preset...]` (see Visual review) | yes |
 
