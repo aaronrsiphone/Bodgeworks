@@ -1,5 +1,5 @@
 {
-  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). A propeller's steer is how many degrees it swivels when you steer, and air is how much of its push it keeps out of the water (0.2 = a fifth). Add a new part by copying one and changing the numbers.",
+  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). A propeller's steer is how many degrees it swivels when you steer, and air is how much of its push it keeps out of the water (0.2 = a fifth). Add a new part by copying one and changing the numbers. shape (optional) makes a part thinner than a whole cell: a list of boxes, each with a size [x, y, z] in metres and an offset [x, y, z] from the middle of the cell (y -0.4 = sitting on the bottom, z +0.4 = at the back). The boxes are both what you see and what things bump into, and the part's weight is spread over them. Turning the part (R in the garage) turns the boxes too.",
 
   "block": {
     "name": "Wooden Block",
@@ -40,5 +40,35 @@
     "buoyancy": 10,
     "color": "#3d8bd9",
     "thrust": { "force": 2500, "steer": 30, "air": 0.2 }
+  },
+  "plate": {
+    "name": "Plate",
+    "mass": 15,
+    "buoyancy": 30,
+    "color": "#a8865a",
+    "shape": [
+      { "size": [1, 0.2, 1], "offset": [0, -0.4, 0] }
+    ]
+  },
+  "wall": {
+    "name": "Wall",
+    "mass": 15,
+    "buoyancy": 30,
+    "color": "#8f6d45",
+    "shape": [
+      { "size": [1, 1, 0.2], "offset": [0, 0, 0.4] }
+    ]
+  },
+  "_tray_comment": "A tray is a plate with a low rim on two sides (the back and the right). Turn four of them with R so the rims point outwards and they make a 2 x 2 box that holds a crate.",
+  "tray": {
+    "name": "Tray",
+    "mass": 20,
+    "buoyancy": 40,
+    "color": "#6f9a5a",
+    "shape": [
+      { "size": [1, 0.2, 1], "offset": [0, -0.4, 0] },
+      { "size": [1, 0.4, 0.2], "offset": [0, -0.1, 0.4] },
+      { "size": [0.2, 0.4, 0.8], "offset": [0.4, -0.1, -0.1] }
+    ]
   }
 }

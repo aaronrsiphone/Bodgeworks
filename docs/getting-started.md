@@ -28,10 +28,10 @@ The game starts in the **garage**, with the Buggy ready to change.
 
 | Do this | How |
 |---|---|
-| Pick a part | Click it in the bottom bar, or press 1–6 |
+| Pick a part | Click it in the bottom bar, or press 1–9 |
 | Add a part | Left-click. The see-through ghost shows where it goes and snaps onto the face of the part you point at. Red means it can't go there. |
 | Remove a part | Right-click it |
-| Rotate the part | R (useful for propellers, which push away from their blades) |
+| Rotate the part | R (useful for propellers, which push away from their blades, and for walls and trays) |
 | Turn the camera | Right-drag, or Q/E and the arrow keys |
 | Zoom / slide | Scroll wheel / middle-drag |
 | Mirror mode | M, or the **Mirror** button. A blue line appears down the middle of your vehicle, and every part you add or remove gets a twin on the other side (a second ghost shows where). Ctrl+Z undoes both at once. |
@@ -39,6 +39,16 @@ The game starts in the **garage**, with the Buggy ready to change.
 | Drive it! | G, or the **Test Drive!** button. Press G again to come back. |
 
 Rules: parts must touch the vehicle, a vehicle can have at most 60 parts, and the yellow arrow on the floor points to the front. The panel at the top left warns you if something's missing, like no seat or no engine.
+
+### Thin parts
+
+Not every part fills a whole cell:
+
+- **Plate**: a thin floor at the bottom of its cell.
+- **Wall**: a thin wall at the back of its cell. Turn it with R to put it on another side.
+- **Tray**: a plate with a low rim on two sides. Turn four of them with R so the rims point outwards, and they make a 2 × 2 box that's just right for a crate.
+
+Things slide easily on your vehicle, so a crate on a flat plate slides off the first time you turn. The tray's rim is what keeps it in.
 
 **Save** keeps your vehicle (type a name first). **Load...** brings back a saved vehicle or a starter. Saved vehicles also show up when you press Tab in the test map.
 
@@ -54,7 +64,7 @@ The **Missions** list in the garage starts a challenge with the vehicle you've b
 Tips (spoilers!):
 - A flat front pushes the crate fine in a straight line, but it slides off as soon as you turn. Build "forks" (blocks sticking forward on both sides) so the crate sits between them.
 - The crate floats. Going straight across the pond is shorter, but your vehicle has to swim and climb out too.
-- Carrying the crate on top is another way to do it.
+- Carrying the crate in a tray is another way to do it (see Thin parts). Working out how to get the crate *into* the tray is up to you!
 
 To make your own delivery mission, duplicate `missions/special_delivery.tscn`, then move its **Start**, **Cargo** and **Goal** nodes in the editor and set the medal times in the Inspector. Add it to the `MISSIONS` list in `game.gd`.
 
@@ -109,6 +119,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `engine.force` and `engine.top_speed`: how much push the engine gives, and up to what speed.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
 - `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth).
+- `shape`: makes a part thinner than a whole cell. It's a list of boxes, each with a `size` `[x, y, z]` in metres and an `offset` from the middle of the cell. For example, `{"size": [1, 0.2, 1], "offset": [0, -0.4, 0]}` is a plate lying on the bottom of the cell. The boxes are what you see, what things bump into, and where the part's weight is. Look at the Plate, Wall and Tray to see how it works.
 
 Try a monster-grip wheel, or a float that makes things fly out of the water.
 
@@ -160,6 +171,12 @@ An autopilot can play the delivery mission and report the time. It fails if it d
 
 ```
 godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json
+```
+
+Add `carry` to start with the crate already sitting in the vehicle's trays. Then the test also fails if the crate falls out before the finish:
+
+```
+godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/carrier.json carry
 ```
 
 The garage test clicks around like a player would, so it needs a window:

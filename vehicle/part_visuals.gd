@@ -4,7 +4,8 @@ class_name PartVisuals
 ## coloured cube, so a new part in parts.json shows up without any code.
 
 
-## Returns a Node3D centred on the part's grid cell.
+## Returns a Node3D centred on the part's grid cell. Turn it with its basis
+## (the garage and vehicle do), and any thin "shape" boxes turn with it.
 ## Propellers have a child called "Spinner" that the vehicle spins.
 static func create(id: String, def: Dictionary) -> Node3D:
 	var color := Color(def.get("color", "#cccccc"))
@@ -15,6 +16,16 @@ static func create(id: String, def: Dictionary) -> Node3D:
 		var r := float(def.wheel.get("radius", 0.45))
 		root.add_child(cylinder(r, 0.4, color, Vector3(0, 0, PI / 2)))
 		root.add_child(cylinder(r * 0.45, 0.42, Color("#9a9a9a"), Vector3(0, 0, PI / 2)))
+		return root
+
+	# Thin parts (plates, walls, trays) look exactly like their collision boxes.
+	# The first box is the main piece; the rest (like a tray's rim) are a bit darker.
+	if def.has("shape"):
+		var first := true
+		for b in PartCatalog.shape_boxes(def):
+			var size: Vector3 = b.size
+			root.add_child(box((size - Vector3.ONE * 0.02).max(Vector3.ONE * 0.02), b.offset, color if first else color.darkened(0.25)))
+			first = false
 		return root
 
 	match id:

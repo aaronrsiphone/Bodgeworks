@@ -41,7 +41,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
@@ -71,19 +71,21 @@ docs/.gdignore           keeps Godot from importing docs/
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
 - `thrust: {force, steer, air}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
 
+Optional `shape`: one box `{"size": [x,y,z], "offset": [x,y,z]}` or a list of them, in metres from the cell centre, in the part's unrotated frame (`rot` turns them). They become the vehicle colliders, the garage pick colliders and the default visual (first box in `color`, the rest darker). Mass is split over the boxes by volume, so the centre of mass and inertia use the real shape. Read them with `PartCatalog.shape_boxes(def)`. Thin parts: `plate` (floor), `wall` (back edge), `tray` (plate + rims on back and right; four, rotated rims-out, make a 2×2 bed). Keys in `parts.json` starting with `_` are comments.
+
 A part with no special look renders as a cube, so new parts need no code unless they need a new behaviour.
 
 ## Physics model (vehicle/vehicle.gd)
 
-- **Compile:** all parts become box colliders (except wheels) on one RigidBody3D. Mass, centre of mass (custom) and diagonal inertia are summed from the parts. The vehicle is shifted so its origin sits under the centre of mass horizontally.
+- **Compile:** all parts become box colliders (except wheels) on one RigidBody3D, one per `shape` box (a whole cell by default). Mass, centre of mass (custom) and diagonal inertia are summed from the boxes. The vehicle is shifted so its origin sits under the centre of mass horizontally.
   - No joints yet, so nothing can move relative to anything else.
 - **Wheels:** a ray from the mount, masked to `LAYER_WORLD` only, so wheels never climb onto crates.
   - Self-tuning spring and damper.
   - Tyre force (drive + rolling resistance + side grip) is clamped to `load * grip`, and **applied at axle height** to avoid wheelies and flips.
   - Wheels in front of the centre of mass steer. Steering lock shrinks with speed.
 - **Propellers:** force `thrust × lerp(air, 1, submerged) × throttle × taper`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
-- **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
-- Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
+- **Water:** per part, `submerged_at(point, height)` gives buoyancy at the part's centre of mass, scaled by its shape's height, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
+- Vehicle bodies have friction 0.2, so pushed objects slide off them. That includes cargo on a flat plate (it slides off on the first turn); trays hold it with their rims. Air drag is quadratic.
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
 
 ## Testing
@@ -108,8 +110,9 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
 | Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim>` | no |
-| Garage clicks (22 checks, incl. mirror mode) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
+| Garage clicks (mirror mode, thin parts, ...) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
+| Mission, carrying | same, with `-- res://tests/blueprints/carrier.json carry`: puts the crate in the trays at the start, fails if it isn't still in them at the finish (expect gold, about 9.9 s) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- <scene\|all> <out_dir> [preset...]` (see Visual review) | yes |
 
 Gotchas:
@@ -147,7 +150,7 @@ Presets live in `tests/screenshot_presets.json`. Each one loads its scene fresh.
 | `action` | Scripted action run before simulating. Right now: `deliver_cargo` (drops the mission cargo into the goal; `mission_time` sets the clock shown). |
 | `seconds` | How long to simulate before the shot. |
 
-The current presets are `garage_overview`, `garage_closeup`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
+The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
 
 **Colours look flatter than on real hardware.** Under xvfb, Godot runs the Compatibility (OpenGL) renderer on llvmpipe (software rendering): no Forward+ lighting, weaker shading, and distant ground washes out in the fog. Judge layout, framing, UI and presence of objects, not exact colour or lighting quality.
 
