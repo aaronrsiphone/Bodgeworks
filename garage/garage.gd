@@ -296,9 +296,11 @@ func _update_info() -> void:
 	var mass := 0.0
 	var buoyancy := 0.0
 	var count := {}
+	var defs := []
 	for cell in parts:
 		var id: String = parts[cell].part
 		var def := PartCatalog.get_part(id)
+		defs.append(def)
 		mass += float(def.get("mass", 0))
 		buoyancy += float(def.get("buoyancy", 0))
 		for behaviour in ["seat", "engine", "wheel", "thrust"]:
@@ -316,6 +318,10 @@ func _update_info() -> void:
 			t += "[color=#ff8080]No seat: nobody can drive it![/color]\n"
 		if not count.has("engine"):
 			t += "[color=#ff8080]No engine: it won't go![/color]\n"
+		var f := Vehicle.fuel_for(defs)
+		var secs := Vehicle.fuel_seconds(f.capacity, f.use)
+		if f.use > 0.0:
+			t += "Fuel: %d s at full throttle%s\n" % [roundi(secs), "" if f.tanks > 0 else " (seat reserve; add a Fuel Tank for more)"]
 		if not count.has("wheel") and not count.has("thrust"):
 			t += "[color=#ff8080]No wheels or propellers: it can't move![/color]\n"
 	_info.text = t

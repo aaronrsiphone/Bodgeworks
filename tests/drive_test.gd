@@ -4,11 +4,12 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "jump", "fly"]
-const VEHICLES := ["buggy", "amphibian", "forklift", "winged_buggy", "plane"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "fuel", "jump", "fly"]
+const VEHICLES := ["buggy", "amphibian", "forklift", "buggy_tank", "winged_buggy", "plane"]
 const BLUEPRINTS := {
 	"amphibian": "res://data/blueprints/amphibian.json",
 	"forklift": "res://tests/blueprints/forklift.json",
+	"buggy_tank": "res://tests/blueprints/buggy_tank.json",
 	"winged_buggy": "res://tests/blueprints/winged_buggy.json",
 	"plane": "res://data/blueprints/plane.json",
 }
@@ -29,6 +30,10 @@ var crate_worst_ahead := -INF # from 2 s on, how far ahead the crate got at most
 var crate_closest_ahead := INF # ...and how close (negative = behind the vehicle)
 var crate_worst_side := 0.0 # ...and how far off to the side
 var failures := 0
+const FUEL_RESERVE := 2.0 # "fuel" scenario: a tiny seat reserve, so a tankless buggy runs dry fast
+var fuel_start := 0.0
+var fuel_out_at := -1.0 # seconds when the fuel hit zero (-1 = never)
+var top_speed_seen := 0.0
 var max_height := -INF
 # Jump scenario: a vehicle with wings first watches a plain buggy jump, to compare.
 var jump_runs: Array[Dictionary] = [] # {name, distance, height} per finished jump
@@ -86,6 +91,11 @@ func _physics_process(_delta: float) -> bool:
 		if scenario == "ramp":
 			# Line up on the boat ramp facing into the pond (+x).
 			v.global_transform = Transform3D(Basis(Vector3.UP, -PI / 2), Vector3(15, 1, -10))
+		if scenario == "fuel" and not v.has_tanks:
+			# Shrink the seat's reserve can, so it runs out after FUEL_RESERVE s of full throttle.
+			v.fuel_capacity = FUEL_RESERVE
+			v.fuel = FUEL_RESERVE
+		fuel_start = v.fuel
 		if scenario == "fly":
 			# The long open runway along the east side of the map, heading north.
 			v.global_transform = Transform3D(Basis.IDENTITY, Vector3(100, 1, 110))
@@ -117,6 +127,11 @@ func _physics_process(_delta: float) -> bool:
 		"swim":
 			if frame > 30: Input.action_press("accelerate")
 			if frame > 120: Input.action_press("steer_left")
+		"fuel":
+			if frame > 60: Input.action_press("accelerate")
+			if fuel_out_at < 0.0 and v.fuel <= 0.0:
+				fuel_out_at = frame / 60.0
+			top_speed_seen = maxf(top_speed_seen, v.speed_kmh())
 		"fly":
 			if frame > 30: Input.action_press("accelerate")
 		"jump":
@@ -147,6 +162,8 @@ func _physics_process(_delta: float) -> bool:
 		print("t=%4.1fs pos=(%6.1f %5.2f %6.1f) speed=%5.1f km/h upright=%.2f pitch=%3.0f roll=%3.0f wheels_down=%d heading=%4.0f" % [
 			frame / 60.0, v.global_position.x, v.global_position.y, v.global_position.z,
 			v.speed_kmh(), up.y, pitch, roll, grounded, heading])
+		if scenario == "fuel":
+			print("        fuel=%.2f / %.0f" % [v.fuel, v.fuel_capacity])
 		if crate:
 			print("        crate=(%6.1f %5.2f %6.1f) %.1f m ahead" % [crate.position.x, crate.position.y, crate.position.z, (crate.position - v.global_position).dot(-v.global_basis.z)])
 	if scenario == "jump" and frame >= JUMP_FRAMES:
@@ -220,6 +237,18 @@ func _check_expectations(v: Vehicle) -> void:
 			check(moved >= 60.0, "drove up the boat ramp and on at least 60 m (%.1f m)" % moved)
 		"swim":
 			check(absf(turned) > 60.0, "heading changed by more than 60 deg in the water (%.0f deg)" % turned)
+		"fuel":
+			var speed := v.speed_kmh()
+			if v.has_tanks:
+				check(v.fuel > 0.0, "still has fuel after 9 s of full throttle (%.1f left)" % v.fuel)
+				var burned := fuel_start - v.fuel
+				check(absf(burned - 9.0 * v.fuel_use) < 0.5, "burned about %.1f fuel (%.1f)" % [9.0 * v.fuel_use, burned])
+				check(speed > 30.0, "kept driving to the end (%.0f km/h > 30)" % speed)
+			else:
+				# Throttle goes down at t = 1 s, so the reserve should run dry at 1 + reserve / use.
+				var expected := 1.0 + FUEL_RESERVE / v.fuel_use
+				check(absf(fuel_out_at - expected) < 0.2, "ran out of fuel at about %.1f s (%.2f s)" % [expected, fuel_out_at])
+				check(speed < 0.6 * top_speed_seen, "slowed down once the fuel ran out (%.0f km/h, best %.0f)" % [speed, top_speed_seen])
 		"pond":
 			if vehicle_arg == "amphibian":
 				check(moved >= 10.0, "swam at least 10 m across the pond (%.1f m)" % moved)

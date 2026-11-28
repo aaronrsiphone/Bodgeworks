@@ -41,7 +41,8 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, winged_buggy.json = jump test)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, winged_buggy.json = jump test,
+                         buggy_tank.json = buggy + fuel tank)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
@@ -66,8 +67,10 @@ docs/.gdignore           keeps Godot from importing docs/
 - JSON numbers load as floats, so wrap them in `int()` for grid cells.
 
 **Part** (`data/parts.json`): `name`, `mass`, `buoyancy` (kg it can hold up under water; more than its mass means it floats) and `color`. Behaviour keys:
-- `seat: {}` — a vehicle needs one to drive.
-- `engine: {force, top_speed}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s).
+- `seat` — a vehicle needs one to drive.
+- `engine: {force, top_speed, fuel_use}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s). `fuel_use` is fuel units per second at full throttle.
+- `fuel: {capacity}` — a fuel tank. Tanks' capacities add up.
+- `seat: {reserve_fuel}` — the fuel a vehicle gets when it has **no** tank (largest seat's value; 30 = 30 s for one engine).
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
 - `thrust: {force, steer, air}` — a propeller (`propeller` = boat prop, air 0.2; `air_propeller` = plane prop, air 1.0): pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
 - `wing: {area, lift, stall, camber}` — lift and drag from airflow (see Physics model). Two parts use it: `wing` (camber 0.6, lifts when level: for planes) and `flat_wing` (camber 0: tails, and gliding cars that must keep tyre grip).
@@ -90,6 +93,7 @@ A part with no special look renders as a cube, so new parts need no code unless 
   - The boat `propeller` keeps `air` 0.2. Planes use `air_propeller` (`air` 1.0): same behaviour, full push in the air. Engine taper still applies, and Godot's default linear damping (0.1/s) is a hidden drag of about 600 N at flying speed.
 - **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
+- **Fuel:** `fuel` drains by `fuel_use × |throttle| × delta`. At 0 there's no wheel drive or propeller push. `Vehicle.fuel_for(defs)` sums the numbers and the garage uses it too. A new Vehicle starts full, so respawn, restart and garage all refill. (This doesn't scale with power used yet; revisit when #6 lands.)
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
 
 ## Testing
@@ -113,7 +117,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|winged_buggy\|plane\|res://path.json> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|jump\|fly>` | no |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|buggy_tank\|winged_buggy\|plane\|res://path.json> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|fuel\|jump\|fly>` | no |
 | Garage clicks (10 checks) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- <scene\|all> <out_dir> [preset...]` (see Visual review) | yes |

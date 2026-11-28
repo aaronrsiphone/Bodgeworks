@@ -49,7 +49,7 @@ Each phase leaves the game playable. Within a phase, issues are mostly independe
 |---|---|---|
 | #5 | Garage mirror mode | no |
 | #6 | Engine power budget shared by wheels and propellers | no |
-| #7 | Fuel tank and fuel use (after #6) | no |
+| #7 | Fuel tank and fuel use (done; fuel scales with throttle until #6) | no |
 | #8 | Wing part: lift and drag, first flights | no |
 | #9 | Accessory buttons (Input Mapper) and Spring part | **yes** |
 | #10 | Thin parts: plate, wall, tray (carry cargo) | no |
