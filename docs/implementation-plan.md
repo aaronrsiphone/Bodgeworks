@@ -21,7 +21,7 @@ This plan compares that baseline with `spec/architecture.md` and `spec/game-mech
 | Garage editor | Place, remove, rotate, undo, stats | mirror #5, gamepad #11, centre-of-mass/thrust visualisation #12, shop #22 |
 | Input Mapper (accessory buttons) | Not started | #9 |
 | Vehicle Graph / Assembly Compiler | Implicit: one body per vehicle | explicit graph and islands #13 |
-| Force Model | Wheels, propellers (half strength in air), water, wings (#8) | power budget #6 |
+| Force Model | Wheels, propellers (boat props weak in air, air props full strength), water, wings (#8) | power budget #6 |
 | Damage & Repair | Not started | #14, wrench #25 |
 | Joints (only where things move) | Not started | hinge and detacher #15 |
 | Rust core (gdext) | Deliberately deferred | measure first #16 |

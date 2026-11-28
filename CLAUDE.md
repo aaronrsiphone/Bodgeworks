@@ -69,7 +69,7 @@ docs/.gdignore           keeps Godot from importing docs/
 - `seat: {}` — a vehicle needs one to drive.
 - `engine: {force, top_speed}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s).
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
-- `thrust: {force, steer, air}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
+- `thrust: {force, steer, air}` — a propeller (`propeller` = boat prop, air 0.2; `air_propeller` = plane prop, air 1.0): pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
 - `wing: {area, lift, stall, camber}` — lift and drag from airflow (see Physics model). Two parts use it: `wing` (camber 0.6, lifts when level: for planes) and `flat_wing` (camber 0: tails, and gliding cars that must keep tyre grip).
 
 A part with no special look renders as a cube, so new parts need no code unless they need a new behaviour.
@@ -87,7 +87,7 @@ A part with no special look renders as a cube, so new parts need no code unless 
   - `AIR_DENSITY` is 10, not 1.2: game air is thick so 400 kg wooden planes take off at about 15 m/s.
   - Pitch stability comes from geometry: flat wings well behind the centre of mass act as a tail. A cambered wing ahead of the COM with no tail pitches up and stalls.
   - Cambered wings on a car unload the tyres on flat ground, so it loses drive (that's why `winged_buggy` uses flat wings).
-  - Propeller `air` is 0.5 (was 0.2) so a plane has thrust left in the air. Engine taper still applies, and Godot's default linear damping (0.1/s) is a hidden drag of about 600 N at flying speed.
+  - The boat `propeller` keeps `air` 0.2. Planes use `air_propeller` (`air` 1.0): same behaviour, full push in the air. Engine taper still applies, and Godot's default linear damping (0.1/s) is a hidden drag of about 600 N at flying speed.
 - **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.

@@ -23,7 +23,7 @@ static func create(id: String, def: Dictionary) -> Node3D:
 			root.add_child(box(Vector3(0.9, 0.8, 0.2), Vector3(0, 0.05, 0.35), color))
 		"float":
 			root.add_child(cylinder(0.45, 0.95, color, Vector3(PI / 2, 0, 0)))
-		"propeller":
+		"propeller", "air_propeller":
 			root.add_child(cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
 			var blades := Node3D.new()
 			blades.name = "Spinner"

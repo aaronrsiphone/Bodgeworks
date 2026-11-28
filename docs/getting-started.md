@@ -28,7 +28,7 @@ The game starts in the **garage**, with the Buggy ready to change.
 
 | Do this | How |
 |---|---|
-| Pick a part | Click it in the bottom bar, or press 1–8 |
+| Pick a part | Click it in the bottom bar, or press 1–9 |
 | Add a part | Left-click. The see-through ghost shows where it goes and snaps onto the face of the part you point at. Red means it can't go there. |
 | Remove a part | Right-click it |
 | Rotate the part | R (useful for propellers, which push away from their blades) |
@@ -100,6 +100,7 @@ Rules the physics enforces:
 - Propellers push from where they are, so one off to the side will turn you.
 - Propellers swivel when you steer, like an outboard motor. That's how you steer in water.
 - Wheels only grip the ground. They can't climb on crates, so push things with your body or forks.
+- A normal **Propeller** is a boat propeller: in the air it only gives a fifth of its push. An **Air Propeller** (orange) pushes just as hard in the air as in water, so it's the one for planes.
 - Wings lift when air flows over them, and the faster you go, the more they lift. They push from where they are, just like propellers.
 - **Wing** (cream) is curved: it lifts even when it's level, so it's the one that gets a plane off the ground. But on a car it makes the tyres light and slippy.
 - **Flat Wing** (pale blue) only lifts when it's tilted into the wind. Use it as a **tail**: a few flat wings well behind the middle keep the nose pointing where you're going, like the feathers on a dart. Without a tail, a plane or a glider tips its nose up and flops.
@@ -114,7 +115,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.force` and `engine.top_speed`: how much push the engine gives, and up to what speed.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
-- `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.5 = half).
+- `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth for a boat **Propeller**; 1.0 for an **Air Propeller**).
 - `wing.area`, `wing.lift`, `wing.stall` and `wing.camber`: how big the wing is in square metres, how strongly it lifts, the angle in degrees where it stalls, and how much it lifts when perfectly level.
 
 Try a monster-grip wheel, or a float that makes things fly out of the water.
