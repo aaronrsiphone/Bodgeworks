@@ -1,0 +1,82 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to the same PR cancels the run that's already going.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  tests:
+    name: Godot test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Godot and the test output live outside the project folder so Godot's
+      # importer never scans them. TEST_OUTPUT_DIR is where run_all.sh (and
+      # this workflow) put per-test logs and garage screenshots for upload on failure.
+      - name: Set paths
+        run: |
+          echo "GODOT_DIR=$RUNNER_TEMP/godot" >> "$GITHUB_ENV"
+          echo "GODOT=$RUNNER_TEMP/godot/godot" >> "$GITHUB_ENV"
+          echo "TEST_OUTPUT_DIR=$RUNNER_TEMP/test-output" >> "$GITHUB_ENV"
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.GODOT_DIR }}
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux.x86_64
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$GODOT_DIR"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/godot.zip" \
+            "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=linux.x86_64.zip&platform=linux.64"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$GODOT_DIR"
+          mv "$GODOT_DIR"/Godot_v*_linux.x86_64 "$GODOT"
+          chmod +x "$GODOT"
+
+      - name: Install xvfb and Mesa (for the garage test)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            xvfb xauth libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 \
+            libxcursor1 libxinerama1 libxrandr2 libxi6 libxkbcommon0 libfontconfig1
+
+      - name: Godot version
+        run: '"$GODOT" --version'
+
+      - name: Import project
+        run: '"$GODOT" --headless --path . --import'
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          mkdir -p "$TEST_OUTPUT_DIR"
+          bash tests/run_all.sh 2>&1 | tee "$TEST_OUTPUT_DIR/run_all.log"
+
+      - name: Upload logs and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ github.run_number }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            ${{ env.TEST_OUTPUT_DIR }}
+            ~/.local/share/godot/app_userdata/Bodgeworks/logs/
