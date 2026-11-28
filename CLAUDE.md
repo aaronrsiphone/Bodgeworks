@@ -47,6 +47,7 @@ tests/                   headless/xvfb test scripts (see Testing)
 tests/blueprints/        test-only vehicles (forklift.json = pusher with forks)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
+docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
 docs/getting-started.md  player/dev guide: install, controls, garage, missions, editing parts/maps
 docs/implementation-plan.md  roadmap; each item links to a GitHub issue
 docs/.gdignore           keeps Godot from importing docs/
