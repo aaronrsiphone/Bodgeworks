@@ -34,6 +34,7 @@ The game starts in the **garage**, with the Buggy ready to change.
 | Rotate the part | R (useful for propellers, which push away from their blades) |
 | Turn the camera | Right-drag, or Q/E and the arrow keys |
 | Zoom / slide | Scroll wheel / middle-drag |
+| Mirror mode | M, or the **Mirror** button. A blue line appears down the middle of your vehicle, and every part you add or remove gets a twin on the other side (a second ghost shows where). Ctrl+Z undoes both at once. |
 | Undo | Ctrl+Z, or the Undo button |
 | Drive it! | G, or the **Test Drive!** button. Press G again to come back. |
 
