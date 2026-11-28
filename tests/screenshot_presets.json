@@ -1,5 +1,5 @@
 {
-  "_help": "Camera presets for tests/screenshot.gd. Fields: name, scene (required); camera {position, look_at, fov} (leave out to keep the scene's own camera); blueprint (spawn this vehicle); mission (play this mission scene in the test map); vehicle {position, yaw in degrees}; hold (input actions held down); action ('deliver_cargo', with optional mission_time); seconds (simulate this long before the shot).",
+  "_help": "Camera presets for tests/screenshot.gd. Fields: name, scene (required); camera {position, look_at, fov} (leave out to keep the scene's own camera); blueprint (spawn this vehicle); mission (play this mission scene in the test map); vehicle {position, yaw in degrees}; hold (input actions held down); action ('deliver_cargo' with optional mission_time, 'wire_mode' in the garage, or 'press_button' with button and after (seconds)); seconds (simulate this long before the shot).",
   "presets": [
     {
       "name": "garage_overview",
@@ -44,6 +44,24 @@
       "mission_time": 13.4,
       "camera": {"position": [64, 8, 4], "look_at": [78, 1, -10]},
       "seconds": 1.5
+    },
+    {
+      "name": "garage_wiring",
+      "scene": "res://garage/garage.tscn",
+      "blueprint": "res://data/blueprints/hopper.json",
+      "action": "wire_mode",
+      "camera": {"position": [-4, 4.5, 6.5], "look_at": [0, 0.5, 1]},
+      "seconds": 0.5
+    },
+    {
+      "name": "hopper_jump",
+      "scene": "res://world/test_map.tscn",
+      "blueprint": "res://data/blueprints/hopper.json",
+      "action": "press_button",
+      "button": 1,
+      "after": 1.5,
+      "camera": {"position": [-9, 2.5, 14], "look_at": [0, 1.5, 10]},
+      "seconds": 1.85
     }
   ]
 }

@@ -4,8 +4,8 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim"]
-const VEHICLES := ["buggy", "amphibian", "forklift"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "hop", "kick"]
+const VEHICLES := ["buggy", "amphibian", "forklift", "hopper"]
 const FRAMES := 600
 
 var main: Node
@@ -21,6 +21,10 @@ var crate_worst_ahead := -INF # from 2 s on, how far ahead the crate got at most
 var crate_closest_ahead := INF # ...and how close (negative = behind the vehicle)
 var crate_worst_side := 0.0 # ...and how far off to the side
 var failures := 0
+var hop_start_y := 0.0 # hop: height just before the spring fires
+var hop_peak := 0.0 # ...and how much higher it got
+var hop_airborne := false # ...did all four wheels leave the ground at once?
+var crate_start := Vector3.ZERO # kick: where the crate was before the kick
 
 
 func _initialize() -> void:
@@ -38,6 +42,8 @@ func _initialize() -> void:
 		main.blueprints.assign(["res://data/blueprints/amphibian.json"])
 	if vehicle_arg == "forklift":
 		main.blueprints.assign(["res://tests/blueprints/forklift.json"])
+	if vehicle_arg == "hopper":
+		main.blueprints.assign(["res://data/blueprints/hopper.json"])
 	root.add_child(main)
 	print("physics engine: ", ProjectSettings.get_setting("physics/3d/physics_engine"))
 
@@ -65,6 +71,13 @@ func _physics_process(_delta: float) -> bool:
 		if scenario == "swim":
 			# Middle of the pond, facing north along its length.
 			v.global_transform = Transform3D(Basis.IDENTITY, Vector3(40, 0, 5))
+		if scenario == "kick":
+			# Open ground, heading west (-x), a crate just in front of the front spring.
+			v.global_transform = Transform3D(Basis(Vector3.UP, PI / 2), Vector3(90, 1, 90))
+			crate = load("res://world/crate.tscn").instantiate()
+			crate.mass = 40.0
+			crate.position = Vector3(86.8, 0.5, 90)
+			main.add_child(crate)
 		if scenario == "pyramid":
 			v.global_position = Vector3(0, 1, -60)
 		if scenario == "ramp":
@@ -95,12 +108,28 @@ func _physics_process(_delta: float) -> bool:
 		"swim":
 			if frame > 30: Input.action_press("accelerate")
 			if frame > 120: Input.action_press("steer_left")
+		"hop":
+			# Sit still for 2 s to settle, then tap button 1 (the downward spring).
+			if frame == 120:
+				hop_start_y = v.global_position.y
+				Input.action_press("accessory_1")
+			if frame == 124: Input.action_release("accessory_1")
+			if frame > 120:
+				hop_peak = maxf(hop_peak, v.global_position.y - hop_start_y)
+				if v.wheels.all(func(w): return not w.grounded):
+					hop_airborne = true
+		"kick":
+			# Settle, then tap button 2 (the forward spring) to kick the crate.
+			if frame == 90:
+				crate_start = crate.global_position
+				Input.action_press("accessory_2")
+			if frame == 94: Input.action_release("accessory_2")
 	min_upright = minf(min_upright, v.global_basis.y.y)
 	if frame > 2:
 		var h := _heading(v)
 		turned += wrapf(h - last_heading, -180.0, 180.0)
 		last_heading = h
-	if crate and frame >= 120:
+	if crate and frame >= 120 and scenario == "push":
 		var to_crate := crate.global_position - v.global_position
 		var ahead := to_crate.dot(-v.global_basis.z)
 		crate_worst_ahead = maxf(crate_worst_ahead, ahead)
@@ -145,6 +174,13 @@ func _check_expectations(v: Vehicle) -> void:
 		"pond":
 			if vehicle_arg == "amphibian":
 				check(moved >= 10.0, "swam at least 10 m across the pond (%.1f m)" % moved)
+		"hop":
+			check(hop_peak > 0.5, "the spring lifted it more than 0.5 m (%.2f m)" % hop_peak)
+			check(hop_airborne, "all wheels left the ground")
+		"kick":
+			var kicked := Vector2(crate.global_position.x - crate_start.x, crate.global_position.z - crate_start.z)
+			check(kicked.length() > 3.0, "the spring kicked the crate more than 3 m (%.1f m)" % kicked.length())
+			check(kicked.x < 0.0, "the crate went forwards (west), not backwards")
 		"push":
 			if vehicle_arg == "forklift":
 				check(crate_closest_ahead > 0.0 and crate_worst_ahead <= 3.0,
