@@ -4,7 +4,8 @@ class_name PartVisuals
 ## coloured cube, so a new part in parts.json shows up without any code.
 
 
-## Returns a Node3D centred on the part's grid cell.
+## Returns a Node3D centred on the part's grid cell. Turn it with its basis
+## (the garage and vehicle do), and any thin "shape" boxes turn with it.
 ## Propellers have a child called "Spinner" that the vehicle spins.
 static func create(id: String, def: Dictionary) -> Node3D:
 	var color := Color(def.get("color", "#cccccc"))
@@ -17,20 +18,54 @@ static func create(id: String, def: Dictionary) -> Node3D:
 		root.add_child(cylinder(r * 0.45, 0.42, Color("#9a9a9a"), Vector3(0, 0, PI / 2)))
 		return root
 
+	# Thin parts (plates, walls, trays) look exactly like their collision boxes.
+	# The first box is the main piece; the rest (like a tray's rim) are a bit darker.
+	if def.has("shape"):
+		var first := true
+		for b in PartCatalog.shape_boxes(def):
+			var size: Vector3 = b.size
+			root.add_child(box((size - Vector3.ONE * 0.02).max(Vector3.ONE * 0.02), b.offset, color if first else color.darkened(0.25)))
+			first = false
+		return root
+
+	if def.has("thrust"):
+		# Any propeller: a hub and two blades. "blade" in parts.json sets their length.
+		var blade := float(def.thrust.get("blade", 0.9))
+		root.add_child(cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
+		var blades := Node3D.new()
+		blades.name = "Spinner"
+		blades.position = Vector3(0, 0, 0.3)
+		blades.add_child(box(Vector3(blade, 0.12, 0.05), Vector3.ZERO, color))
+		blades.add_child(box(Vector3(0.12, blade, 0.05), Vector3.ZERO, color))
+		root.add_child(blades)
+		return root
+
 	match id:
 		"seat":
 			root.add_child(box(Vector3(0.9, 0.3, 0.9), Vector3(0, -0.35, 0), color))
 			root.add_child(box(Vector3(0.9, 0.8, 0.2), Vector3(0, 0.05, 0.35), color))
 		"float":
 			root.add_child(cylinder(0.45, 0.95, color, Vector3(PI / 2, 0, 0)))
-		"propeller":
-			root.add_child(cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
-			var blades := Node3D.new()
-			blades.name = "Spinner"
-			blades.position = Vector3(0, 0, 0.3)
-			blades.add_child(box(Vector3(0.9, 0.12, 0.05), Vector3.ZERO, color))
-			blades.add_child(box(Vector3(0.12, 0.9, 0.05), Vector3.ZERO, color))
-			root.add_child(blades)
+		"wing", "flat_wing":
+			# A thin board with a rounder front edge. (It still collides like a full cube.)
+			root.add_child(box(Vector3(0.98, 0.08, 0.98), Vector3(0, -0.2, 0), color))
+			root.add_child(cylinder(0.06, 0.98, color, Vector3(0, 0, PI / 2), Vector3(0, -0.2, -0.46)))
+		"spring":
+			# A base plate at the back, a coil, and a foot that kicks out forwards
+			# (the part's facing). The vehicle moves "Foot" and stretches "Coil" when it fires.
+			root.add_child(box(Vector3(0.95, 0.95, 0.2), Vector3(0, 0, 0.38), Color("#5a6270")))
+			var coil := Node3D.new()
+			coil.name = "Coil"
+			coil.position = Vector3(0, 0, 0.28) # the coil grows forwards from the base
+			var rings := 4
+			for i in rings:
+				var ring := cylinder(0.3, 0.08, color, Vector3(PI / 2, 0, 0), Vector3(0, 0, -(i + 0.5) * 0.55 / rings))
+				coil.add_child(ring)
+			coil.add_child(cylinder(0.08, 0.55, Color("#9a9a9a"), Vector3(PI / 2, 0, 0), Vector3(0, 0, -0.275)))
+			root.add_child(coil)
+			var foot := box(Vector3(0.8, 0.8, 0.12), Vector3(0, 0, -0.38), Color("#e8a33d"))
+			foot.name = "Foot"
+			root.add_child(foot)
 		"engine":
 			root.add_child(box(Vector3(0.9, 0.7, 0.9), Vector3(0, -0.15, 0), color))
 			root.add_child(cylinder(0.08, 0.5, Color("#333333"), Vector3.ZERO, Vector3(0.25, 0.35, 0.3)))

@@ -6,13 +6,46 @@ const PARTS_PATH := "res://data/parts.json"
 const STARTER_DIR := "res://data/blueprints"
 const SAVE_DIR := "user://blueprints"
 
+## Behaviours that do something when you press an accessory button (1/2/3).
+## A new one needs an entry here plus an _activate_<name>() function in vehicle.gd.
+const BUTTON_BEHAVIOURS := ["spring"]
+const BUTTON_COUNT := 3 # accessory buttons 1, 2 and 3
+
 static var _parts: Dictionary = {}
+
+
+## Which way a part faces for a blueprint "rot" value.
+##   0-3: turned round in 90 degree steps (0 = forward, 1 = left, 2 = back, 3 = right)
+##   4:   pointing down      5: pointing up   (only parts with "can_face_up_down")
+static func rot_basis(rot: int) -> Basis:
+	match rot:
+		4: return Basis(Vector3.RIGHT, -PI / 2.0) # forward (-z) tipped to point at the floor
+		5: return Basis(Vector3.RIGHT, PI / 2.0)
+	return Basis(Vector3.UP, rot * PI / 2.0)
+
+
+## How many ways R can turn this part: wheels 1, most parts 4, up/down parts 6.
+static func rot_count(def: Dictionary) -> int:
+	if def.has("wheel"):
+		return 1
+	return 6 if def.get("can_face_up_down", false) else 4
+
+
+## True if pressing a button makes this part do something.
+static func uses_button(def: Dictionary) -> bool:
+	for b in BUTTON_BEHAVIOURS:
+		if def.has(b):
+			return true
+	return false
 
 
 static func parts() -> Dictionary:
 	if _parts.is_empty():
 		_parts = load_json(PARTS_PATH)
-		_parts.erase("_comment")
+		# Keys starting with "_" are notes for people, not parts.
+		for key in _parts.keys():
+			if str(key).begins_with("_"):
+				_parts.erase(key)
 	return _parts
 
 
@@ -22,6 +55,27 @@ static func get_part(id: String) -> Dictionary:
 		push_error("Unknown part '%s'. Is it in %s?" % [id, PARTS_PATH])
 		return {}
 	return all[id]
+
+
+## The boxes a part is made of, in the part's own directions (before it's turned).
+## Each is {"size": Vector3, "offset": Vector3} in metres, offset from the middle
+## of the cell. A part without "shape" in parts.json is one whole cell. "shape"
+## can be one box ({"size": ..., "offset": ...}) or a list of them.
+static func shape_boxes(def: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var shape = def.get("shape", null)
+	var list: Array = []
+	if shape is Dictionary:
+		list = [shape]
+	elif shape is Array:
+		list = shape
+	for b in list:
+		var s: Array = b.get("size", [1, 1, 1])
+		var o: Array = b.get("offset", [0, 0, 0])
+		out.append({"size": Vector3(s[0], s[1], s[2]), "offset": Vector3(o[0], o[1], o[2])})
+	if out.is_empty():
+		out.append({"size": Vector3.ONE, "offset": Vector3.ZERO})
+	return out
 
 
 static func load_blueprint(path: String) -> Dictionary:

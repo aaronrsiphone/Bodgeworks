@@ -1,5 +1,5 @@
 {
-  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). A propeller's steer is how many degrees it swivels when you steer, and air is how much of its push it keeps out of the water (0.2 = a fifth). Add a new part by copying one and changing the numbers.",
+  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). An engine's power (watts) is shared by every wheel on the ground and every propeller: more engines = more power, but more weight. Its force is the most push it gives when you're standing still. A propeller's force is the most it can push by itself, its steer is how many degrees it swivels when you steer, air is how much of its push it keeps out of the water and water how much it keeps under water (1 = all of it, 0.3 = about a third, 0 = none). blade is how long its blades look, in metres. An engine's fuel_use is how much fuel it burns per second at full power: it burns less when only part of its power is being used. A fuel tank's capacity is how much fuel it holds. The seat's reserve_fuel is a can under the seat that every vehicle gets; fuel tanks add to it. A wing's area is its size in square metres (more area = more lift and drag), lift multiplies how strongly it lifts, stall is the angle in degrees where it stops lifting, and camber is how much it lifts when it's perfectly level (a curved wing lifts even when flat; a flat tail wing doesn't, which is what keeps a plane's nose steady). A spring's impulse is how hard it kicks (in newton-seconds: 4000 throws a 500 kg car about 8 m/s), kick_speed is the fastest it can fling a light crate (m/s), reach is how far past its cell the foot stretches (m), and cooldown is the seconds before it can kick again. can_face_up_down lets R in the garage point the part down and up too, not just round. Add a new part by copying one and changing the numbers. shape (optional) makes a part thinner than a whole cell: a list of boxes, each with a size [x, y, z] in metres and an offset [x, y, z] from the middle of the cell (y -0.4 = sitting on the bottom, z +0.4 = at the back). The boxes are both what you see and what things bump into, and the part's weight is spread over them. Turning the part (R in the garage) turns the boxes too.",
 
   "block": {
     "name": "Wooden Block",
@@ -12,14 +12,14 @@
     "mass": 30,
     "buoyancy": 40,
     "color": "#d94f3d",
-    "seat": {}
+    "seat": { "reserve_fuel": 120 }
   },
   "engine": {
     "name": "Engine",
     "mass": 80,
     "buoyancy": 30,
     "color": "#5a6270",
-    "engine": { "force": 6000, "top_speed": 25 }
+    "engine": { "force": 6000, "power": 38000, "fuel_use": 1 }
   },
   "wheel": {
     "name": "Wheel",
@@ -35,10 +35,76 @@
     "color": "#f2c230"
   },
   "propeller": {
-    "name": "Propeller",
+    "name": "Water Propeller",
     "mass": 20,
     "buoyancy": 10,
     "color": "#3d8bd9",
-    "thrust": { "force": 2500, "steer": 30, "air": 0.2 }
+    "thrust": { "force": 1800, "steer": 30, "air": 0, "water": 1, "blade": 0.9 }
+  },
+  "air_propeller": {
+    "name": "Air Propeller",
+    "mass": 25,
+    "buoyancy": 10,
+    "color": "#e8e8e8",
+    "thrust": { "force": 1800, "steer": 30, "air": 1, "water": 0.3, "blade": 1.6 }
+  },
+  "plate": {
+    "name": "Plate",
+    "mass": 15,
+    "buoyancy": 30,
+    "color": "#a8865a",
+    "shape": [
+      { "size": [1, 0.2, 1], "offset": [0, -0.4, 0] }
+    ]
+  },
+  "wall": {
+    "name": "Wall",
+    "mass": 15,
+    "buoyancy": 30,
+    "color": "#8f6d45",
+    "shape": [
+      { "size": [1, 1, 0.2], "offset": [0, 0, 0.4] }
+    ]
+  },
+  "_tray_comment": "A tray is a plate with a low rim on two sides (the back and the right). Turn four of them with R so the rims point outwards and they make a 2 x 2 box that holds a crate.",
+  "tray": {
+    "name": "Tray",
+    "mass": 20,
+    "buoyancy": 40,
+    "color": "#6f9a5a",
+    "shape": [
+      { "size": [1, 0.2, 1], "offset": [0, -0.4, 0] },
+      { "size": [1, 0.4, 0.2], "offset": [0, -0.1, 0.4] },
+      { "size": [0.2, 0.4, 0.8], "offset": [0.4, -0.1, -0.1] }
+    ]
+  },
+  "fuel_tank": {
+    "name": "Fuel Tank",
+    "mass": 40,
+    "buoyancy": 60,
+    "color": "#3fa34d",
+    "fuel": { "capacity": 60 }
+  },
+  "wing": {
+    "name": "Wing",
+    "mass": 15,
+    "buoyancy": 20,
+    "color": "#e8e4d8",
+    "wing": { "area": 1.0, "lift": 1.0, "stall": 15, "camber": 0.6 }
+  },
+  "flat_wing": {
+    "name": "Flat Wing",
+    "mass": 10,
+    "buoyancy": 15,
+    "color": "#a9c4d6",
+    "wing": { "area": 1.0, "lift": 1.0, "stall": 15, "camber": 0.0 }
+  },
+  "spring": {
+    "name": "Spring",
+    "mass": 25,
+    "buoyancy": 20,
+    "color": "#e0e0e0",
+    "can_face_up_down": true,
+    "spring": { "impulse": 4000, "kick_speed": 12, "reach": 1.0, "cooldown": 1.0 }
   }
 }

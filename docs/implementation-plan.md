@@ -16,12 +16,12 @@ This plan compares that baseline with `spec/architecture.md` and `spec/game-mech
 
 | Spec / architecture piece | Status | Issues |
 |---|---|---|
-| Part Catalog (data-driven) | Done: `data/parts.json` | thin parts #10, fuel #7, wing #8, spring #9 |
+| Part Catalog (data-driven) | Done: `data/parts.json`, including thin parts (#10), fuel tank (#7), wings (#8) and the Spring (#9) | |
 | Blueprints (save, load, share) | Save and load done | sharing codes #29 |
 | Garage editor | Place, remove, rotate, undo, stats | mirror #5, gamepad #11, centre-of-mass/thrust visualisation #12, shop #22 |
-| Input Mapper (accessory buttons) | Not started | #9 |
+| Input Mapper (accessory buttons) | Done: buttons 1/2/3, garage wire mode, Spring part | #9 |
 | Vehicle Graph / Assembly Compiler | Implicit: one body per vehicle | explicit graph and islands #13 |
-| Force Model | Wheels, propellers (weak in air), water | power budget #6, wings #8 |
+| Force Model | Wheels, propellers (boat props weak in air, air props full strength), water, wings (#8) | power budget #6 |
 | Damage & Repair | Not started | #14, wrench #25 |
 | Joints (only where things move) | Not started | hinge and detacher #15 |
 | Rust core (gdext) | Deliberately deferred | measure first #16 |
@@ -49,7 +49,7 @@ Each phase leaves the game playable. Within a phase, issues are mostly independe
 |---|---|---|
 | #5 | Garage mirror mode | no |
 | #6 | Engine power budget shared by wheels and propellers | no |
-| #7 | Fuel tank and fuel use (after #6) | no |
+| #7 | Fuel tank and fuel use (done; fuel scales with throttle until #6) | no |
 | #8 | Wing part: lift and drag, first flights | no |
 | #9 | Accessory buttons (Input Mapper) and Spring part | **yes** |
 | #10 | Thin parts: plate, wall, tray (carry cargo) | no |

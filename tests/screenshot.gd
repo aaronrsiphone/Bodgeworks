@@ -2,7 +2,7 @@ extends SceneTree
 ## Renders PNG screenshots of any scene, from camera presets in tests/screenshot_presets.json.
 ## Needs a display (not --headless). On a server, run it under xvfb-run:
 ##
-##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility \
+##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 \
 ##       --script res://tests/screenshot.gd -- <scene|all> <out_dir> [preset...]
 ##
 ##   all                         every preset in the file
@@ -143,8 +143,27 @@ func _action(scene: Node, action: String, p: Dictionary) -> void:
 			m.time = p.get("mission_time", m.time)
 			m.cargo.global_position = m.goal.global_position + Vector3.UP
 			m.cargo.linear_velocity = Vector3.ZERO
+		"wire_mode":
+			# Garage: turn on wire mode so the button badges show.
+			if not scene.has_method("set_wiring"):
+				_fail("%s: wire_mode needs the garage" % p.name)
+				return
+			scene.set_wiring(true)
+		"press_button":
+			# Test map: press accessory button "button" after "after" seconds (to let the vehicle land first).
+			if scene.get("vehicle") == null:
+				_fail("%s: press_button needs a vehicle" % p.name)
+				return
+			_press_later(scene, int(p.get("button", 1)), float(p.get("after", 0.0)))
 		_:
 			_fail("%s: unknown action '%s'" % [p.name, action])
+
+
+func _press_later(scene: Node, button: int, after: float) -> void:
+	for i in roundi(after * Engine.physics_ticks_per_second):
+		await physics_frame
+	if is_instance_valid(scene) and scene.vehicle:
+		scene.vehicle.press_button(button)
 
 
 ## Catches the obvious failures: wrong size, or one flat colour (a blank frame).

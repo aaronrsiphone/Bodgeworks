@@ -1,0 +1,14 @@
+{
+  "_comment": "Test vehicle: a buggy with a 2 x 2 tray bed in front. Each tray has rims on two sides, turned (rot) so the rims face outwards and box the crate in.",
+  "name": "Carrier (test)",
+  "parts": [
+    { "part": "block", "pos": [0, 0, 0] }, { "part": "block", "pos": [1, 0, 0] },
+    { "part": "block", "pos": [0, 0, 1] }, { "part": "block", "pos": [1, 0, 1] },
+    { "part": "block", "pos": [0, 0, 2] }, { "part": "block", "pos": [1, 0, 2] },
+    { "part": "seat", "pos": [0, 1, 1] }, { "part": "engine", "pos": [1, 1, 2] },
+    { "part": "tray", "pos": [0, 0, -2], "rot": 2 }, { "part": "tray", "pos": [1, 0, -2], "rot": 1 },
+    { "part": "tray", "pos": [0, 0, -1], "rot": 3 }, { "part": "tray", "pos": [1, 0, -1], "rot": 0 },
+    { "part": "wheel", "pos": [-1, 0, -2] }, { "part": "wheel", "pos": [2, 0, -2] },
+    { "part": "wheel", "pos": [-1, 0, 2] }, { "part": "wheel", "pos": [2, 0, 2] }
+  ]
+}

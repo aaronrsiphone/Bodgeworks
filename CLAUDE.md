@@ -20,13 +20,16 @@ project.godot            settings: Jolt, autoload Game, layer names, main scene 
 game.gd                  autoload Game: current blueprint, mission list (MISSIONS), save file
                          (user://save.json, best times), tier_for(), format_time(), scene switching
 data/parts.json          PART CATALOG: every part's numbers; behaviours are keys (see below)
-data/blueprints/*.json   starter vehicles (Buggy, Amphibian); appear in garage Load and test-map Tab
+data/blueprints/*.json   starter vehicles (Buggy, Amphibian, Plane, Hopper); appear in garage Load and test-map Tab
 vehicle/vehicle.gd       Vehicle (RigidBody3D): compiles a blueprint into ONE body, then applies
-                         per-part forces each tick: wheels, propellers, buoyancy, drag. Core physics lives here.
-vehicle/part_catalog.gd  PartCatalog: loads parts/blueprints JSON, saves to user://blueprints, lists files
+                         per-part forces each tick: wheels, propellers, wings, buoyancy, drag, plus accessory
+                         buttons (press_button -> _activate_<behaviour>). Core physics lives here.
+vehicle/part_catalog.gd  PartCatalog: loads parts/blueprints JSON, saves to user://blueprints, lists files;
+                         shape_boxes() (thin parts), rot_basis()/rot_count() (facings), BUTTON_BEHAVIOURS, uses_button()
 vehicle/part_visuals.gd  PartVisuals: meshes per part (shared by garage and test map), icon()
 garage/garage.gd         garage editor: ghost placement, remove, rotate, mirror mode (M), undo, save/load, stats panel,
-                         missions list; UI is built in code (_build_ui)
+                         wire mode (B: click parts to set button 1/2/3, Label3D badges), missions list;
+                         UI is built in code (_build_ui)
 garage/garage_camera.gd  orbit camera (right-drag, scroll, middle-drag, Q/E and arrows)
 garage/garage.tscn       floor grid, light, FRONT arrow; parts go under the Build node
 world/test_map.tscn      driving level: CSG ground (pond pit + boat ramps, hills, walls), jump ramp,
@@ -41,7 +44,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test, buggy_tank.json = buggy + fuel tank, winged_buggy.json = jump test)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/concept-art/        mood boards and part ideas (art direction, colour coding); inspiration, not specs
@@ -60,30 +63,46 @@ docs/.gdignore           keeps Godot from importing docs/
 
 ## Data formats
 
-**Blueprint:** `{"name": "...", "parts": [{"part": "block", "pos": [x, y, z], "rot": 0-3}]}`.
-- `rot` is a yaw in 90° steps. Wheels ignore it.
+**Blueprint:** `{"name": "...", "parts": [{"part": "block", "pos": [x, y, z], "rot": 0-5, "button": 1-3}]}`.
+- `rot` 0-3 is a yaw in 90° steps; 4 points the part's forward (−Z) down, 5 up (only parts with `can_face_up_down`). `PartCatalog.rot_basis()` turns it into a Basis. Wheels ignore it.
+- `button` (optional, saved only when set) wires the part to accessory button 1-3. Only parts with a behaviour in `PartCatalog.BUTTON_BEHAVIOURS` can be wired.
 - The garage builds only at y ≥ 0, within ±12 cells, with at most 60 parts, and every part must touch another.
 - JSON numbers load as floats, so wrap them in `int()` for grid cells.
 
 **Part** (`data/parts.json`): `name`, `mass`, `buoyancy` (kg it can hold up under water; more than its mass means it floats) and `color`. Behaviour keys:
-- `seat: {}` — a vehicle needs one to drive.
-- `engine: {force, top_speed}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s).
+- `seat: {reserve_fuel}` — a vehicle needs one to drive. `reserve_fuel` is fuel every vehicle gets (largest seat's value; 120 = 2 minutes for one engine). Fuel tanks' capacities add to it.
+- `engine: {force, power, fuel_use}` — engines are summed into one budget. Total push = `min(force, power / speed)`, so power (W) sets the top speed and force (N) the standstill push. `fuel_use` is fuel units per second at full power.
+- `fuel: {capacity}` — a fuel tank. Tanks' capacities add up.
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
-- `thrust: {force, steer, air}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
+- `thrust: {force, steer, air, water, blade}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water and `water` (0–1, default 1) under water. `blade` is the visual blade length. Parts: `propeller` (Water Propeller: air 0, water 1) and `air_propeller` (air 1, water 0.3).
+- `wing: {area, lift, stall, camber}` — lift and drag from airflow (see Physics model). Two parts use it: `wing` (camber 0.6, lifts when level: for planes) and `flat_wing` (camber 0: tails, and gliding cars that must keep tyre grip).
+- `spring: {impulse, kick_speed, reach, cooldown}` — a button part: kicks its foot out along its facing.
+- `can_face_up_down: true` — R in the garage also offers rot 4 (down) and 5 (up). Mirror mode leaves 4 and 5 unchanged.
+
+Optional `shape`: one box `{"size": [x,y,z], "offset": [x,y,z]}` or a list of them, in metres from the cell centre, in the part's unrotated frame (`rot` turns them, via `PartCatalog.rot_basis`). They become the vehicle colliders, the garage pick colliders and the default visual (first box in `color`, the rest darker). Mass is split over the boxes by volume, so the centre of mass and inertia use the real shape. Read them with `PartCatalog.shape_boxes(def)`. Thin parts: `plate` (floor), `wall` (back edge), `tray` (plate + rims on back and right; four, rotated rims-out, make a 2×2 bed). Mirror mode can't mirror the tray's one-sided rim (it only rotates). Keys in `parts.json` starting with `_` are comments.
 
 A part with no special look renders as a cube, so new parts need no code unless they need a new behaviour.
 
 ## Physics model (vehicle/vehicle.gd)
 
-- **Compile:** all parts become box colliders (except wheels) on one RigidBody3D. Mass, centre of mass (custom) and diagonal inertia are summed from the parts. The vehicle is shifted so its origin sits under the centre of mass horizontally.
+- **Compile:** all parts become box colliders (except wheels) on one RigidBody3D, one per `shape` box (a whole cell by default). Mass, centre of mass (custom) and diagonal inertia are summed from the boxes. The vehicle is shifted so its origin sits under the centre of mass horizontally.
   - No joints yet, so nothing can move relative to anything else.
+- **Power budget:** each tick the total push is shared by the consumers: every grounded wheel (weight 1) and every propeller (weight `lerp(air, water, submerged)`). Push opposite to motion (reverse to brake) gets the full `force`. Test: `amphibian power` (6 propellers on one engine must be < 1.5× faster than 2).
 - **Wheels:** a ray from the mount, masked to `LAYER_WORLD` only, so wheels never climb onto crates.
   - Self-tuning spring and damper.
   - Tyre force (drive + rolling resistance + side grip) is clamped to `load * grip`, and **applied at axle height** to avoid wheelies and flips.
   - Wheels in front of the centre of mass steer. Steering lock shrinks with speed.
-- **Propellers:** force `thrust × lerp(air, 1, submerged) × throttle × taper`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
-- **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
-- Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
+- **Propellers:** their power share, capped at `thrust.force × lerp(air, water, submerged)`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
+- **Wings:** per wing, from the point velocity (linear + ω × r). α = angle between the airflow and the wing plane (the wing's up is its normal; yaw `rot` doesn't matter). `Cl = camber + WING_SLOPE·α` up to `stall`, then `WING_STALLED·sin 2α`; `Cd = WING_DRAG + WING_INDUCED·Cl² + sin²α`. Force `½·AIR_DENSITY·v²·area` × (Cl perpendicular to the flow, Cd against it) × (1 − submerged), at the wing's position.
+  - `AIR_DENSITY` is 10, not 1.2: game air is thick so 400 kg wooden planes take off at about 15 m/s.
+  - Pitch stability comes from geometry: flat wings well behind the centre of mass act as a tail. A cambered wing ahead of the COM with no tail pitches up and stalls.
+  - Cambered wings on a car unload the tyres on flat ground, so it loses drive (that's why `winged_buggy` uses flat wings).
+  - Planes use `air_propeller` (air 1, water 0.3) for push in the air. Godot's default linear damping (0.1/s) is a hidden drag of about 600 N at flying speed.
+- **Water:** per part, `submerged_at(point, height)` gives buoyancy at the part's centre of mass, scaled by its shape's height, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
+- Vehicle bodies have friction 0.2, so pushed objects slide off them. That includes cargo on a flat plate (it slides off on the first turn); trays hold it with their rims. Air drag is quadratic.
+- **Fuel:** drains by `fuel_use × engine_load × delta` (`_burn_fuel`). `engine_load` (0–1) = delivered push × max(speed, knee) / `engine_power`, where delivered push is what grounded wheels and propellers actually got from the budget and knee = `power / force`. So full throttle on the road burns `fuel_use`/s, but airborne wheels or a water propeller on land burn nothing. At 0 fuel there's no push. `Vehicle.fuel_for(defs)` sums the numbers and the garage uses it too. A new Vehicle starts full, so respawn, restart and garage all refill.
+- **Accessory buttons:** `main.gd` edge-detects `accessory_1..3` (keys 1/2/3, pad A/X/B) and calls `vehicle.press_button(n)`. The next physics tick calls `_activate_<behaviour>(part)` for each wired part. A new button part = add its behaviour to `PartCatalog.BUTTON_BEHAVIOURS` and write that function.
+- **Spring:** a ray along its facing (reach past the cell face, excluding itself). On a hit, the vehicle gets `−facing × impulse` at the part. A RigidBody hit gets `+facing × impulse`, capped at `mass × kick_speed` so light crates don't fly off at 100 m/s. Then a cooldown; the `Foot`/`Coil` visual stretches out and back.
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
 
 ## Testing
@@ -107,9 +126,10 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim>` | no |
-| Garage clicks (22 checks, incl. mirror mode) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|buggy_tank\|winged_buggy\|plane\|hopper\|res://path.json> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power\|airprop\|fuel\|jump\|fly\|hop\|kick>` | no |
+| Garage clicks (thin parts, wiring a spring, save/load, test drive, mirror mode) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
+| Mission, carrying | same, with `-- res://tests/blueprints/carrier.json carry`: puts the crate in the trays at the start, fails if it isn't still in them at the finish (expect gold, about 9.9 s) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- <scene\|all> <out_dir> [preset...]` (see Visual review) | yes |
 
 Gotchas:
@@ -125,7 +145,7 @@ Gotchas:
 `tests/screenshot.gd` renders PNG screenshots of any scene from named camera presets. Use it to check UI, levels and visuals, and to attach before/after images to PRs (issues labelled `vision-required`).
 
 ```
-xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility \
+xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 \
     --script res://tests/screenshot.gd -- <scene|all> <out_dir> [preset...]
 ```
 
@@ -144,10 +164,10 @@ Presets live in `tests/screenshot_presets.json`. Each one loads its scene fresh.
 | `mission` | Mission scene to play in the test map. |
 | `vehicle` | `{position, yaw}` (yaw in degrees): moves the spawned vehicle. |
 | `hold` | Input actions held down while simulating, e.g. `["accelerate"]`. |
-| `action` | Scripted action run before simulating. Right now: `deliver_cargo` (drops the mission cargo into the goal; `mission_time` sets the clock shown). |
+| `action` | Scripted action run before simulating: `deliver_cargo` (drops the mission cargo into the goal; `mission_time` sets the clock shown), `wire_mode` (garage: shows the button badges), `press_button` (test map: presses accessory `button` after `after` seconds). |
 | `seconds` | How long to simulate before the shot. |
 
-The current presets are `garage_overview`, `garage_closeup`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
+The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `garage_plane`, `garage_wiring`, `plane_flying`, `hopper_jump`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
 
 **Colours look flatter than on real hardware.** Under xvfb, Godot runs the Compatibility (OpenGL) renderer on llvmpipe (software rendering): no Forward+ lighting, weaker shading, and distant ground washes out in the fog. Judge layout, framing, UI and presence of objects, not exact colour or lighting quality.
 

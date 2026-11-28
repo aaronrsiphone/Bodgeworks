@@ -1,0 +1,13 @@
+{
+  "_comment": "Test-only: no wheels, just a seat, an engine and one water propeller at the back. Used by the airprop drive scenario on dry land.",
+  "name": "Water Sled (test)",
+  "parts": [
+    { "part": "block", "pos": [0, 0, 0] },
+    { "part": "block", "pos": [1, 0, 0] },
+    { "part": "block", "pos": [0, 0, 1] },
+    { "part": "block", "pos": [1, 0, 1] },
+    { "part": "seat", "pos": [0, 1, 1] },
+    { "part": "engine", "pos": [1, 1, 1] },
+    { "part": "propeller", "pos": [0, 0, 2] }
+  ]
+}

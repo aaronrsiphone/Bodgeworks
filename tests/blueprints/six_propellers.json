@@ -1,0 +1,26 @@
+{
+  "_comment": "Test-only: the Amphibian with 6 propellers instead of 2, but still ONE engine. With the power budget it should swim about as fast as the Amphibian, not 3x faster.",
+  "name": "Six Propellers (test)",
+  "parts": [
+    { "part": "block", "pos": [0, 0, 0] },
+    { "part": "block", "pos": [1, 0, 0] },
+    { "part": "block", "pos": [0, 0, 1] },
+    { "part": "block", "pos": [1, 0, 1] },
+    { "part": "block", "pos": [0, 0, 2] },
+    { "part": "block", "pos": [1, 0, 2] },
+    { "part": "seat", "pos": [0, 1, 1] },
+    { "part": "engine", "pos": [1, 1, 2] },
+    { "part": "float", "pos": [-1, 0, 1] },
+    { "part": "float", "pos": [2, 0, 1] },
+    { "part": "propeller", "pos": [0, 0, 3] },
+    { "part": "propeller", "pos": [1, 0, 3] },
+    { "part": "propeller", "pos": [-1, 0, 3] },
+    { "part": "propeller", "pos": [2, 0, 3] },
+    { "part": "propeller", "pos": [0, 0, 4] },
+    { "part": "propeller", "pos": [1, 0, 4] },
+    { "part": "wheel", "pos": [-1, 0, 0] },
+    { "part": "wheel", "pos": [2, 0, 0] },
+    { "part": "wheel", "pos": [-1, 0, 2] },
+    { "part": "wheel", "pos": [2, 0, 2] }
+  ]
+}

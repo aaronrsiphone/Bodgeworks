@@ -31,6 +31,14 @@ DRIVE_SCENARIOS=(
 	"amphibian ramp"
 	"amphibian swim"
 	"forklift push"
+	"amphibian power"
+	"buggy airprop"
+	"buggy fuel"
+	"buggy_tank fuel"
+	"winged_buggy jump"
+	"plane fly"
+	"hopper hop"
+	"hopper kick"
 )
 
 names=()
@@ -58,6 +66,7 @@ for s in "${DRIVE_SCENARIOS[@]}"; do
 	run "drive_${s// /_}" "$GODOT" --headless --path . --script res://tests/drive_test.gd -- $s
 done
 run mission_forklift "$GODOT" --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json
+run mission_carrier "$GODOT" --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/carrier.json carry
 
 garage_cmd=("$GODOT" --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd -- "$LOG_DIR")
 skipped=()
