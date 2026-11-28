@@ -169,6 +169,14 @@ The garage test clicks around like a player would, so it needs a window:
 godot --path . --script res://tests/garage_test.gd
 ```
 
+To take screenshots of the garage, the test map, the pond and the mission (they go in the `shots` folder):
+
+```
+godot --path . --script res://tests/screenshot.gd -- all shots
+```
+
+The camera spots are in `tests/screenshot_presets.json`. Add your own there.
+
 ### On GitHub
 
 Every pull request, and every push to `main`, runs `tests/run_all.sh` on GitHub with Godot 4.7.2 (see `.github/workflows/tests.yml`). A green tick on the PR means everything passed. If it goes red, open the **Tests** check to read the log. Logs and screenshots from the failed run are attached at the bottom of the run's summary page under **Artifacts**.
