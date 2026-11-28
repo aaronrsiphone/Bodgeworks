@@ -86,14 +86,22 @@ A part with no special look renders as a cube, so new parts need no code unless 
 
 ## Testing
 
-Godot isn't installed in a fresh cloud container. Download the binary, which is about 75 MB (the host is reachable):
+Godot isn't installed in a fresh cloud container. Download the binary, which is about 75 MB. If the proxy blocks `downloads.godotengine.org`, use the GitHub release instead:
 
 ```
 mkdir -p $SCRATCH/godot && cd $SCRATCH/godot
-curl -sSL -o g.zip "https://downloads.godotengine.org/?version=4.7.2&flavor=stable&slug=linux.x86_64.zip&platform=linux.64"
+curl -sSL -o g.zip "https://downloads.godotengine.org/?version=4.7.2&flavor=stable&slug=linux.x86_64.zip&platform=linux.64" \
+  || curl -sSL -o g.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
 unzip -q g.zip && ln -sf $PWD/Godot_v4.7.2-stable_linux.x86_64 godot
-godot --headless --path . --import        # once, generates .godot/ and *.uid / *.import
 ```
+
+**Run everything:** `GODOT=$SCRATCH/godot/godot tests/run_all.sh` (from the repo root).
+- It imports the project, runs every drive scenario, the mission autopilot and the garage test (under `xvfb-run`) in parallel, takes about 25 s, prints `PASS`/`FAIL` per test plus a summary, and **exits non-zero if anything failed**.
+- A test also fails if it times out (`TEST_TIMEOUT`, default 180 s), prints a `SCRIPT ERROR`, or never prints a `RESULT ... PASS` line.
+- Logs (one per test) and garage screenshots go to `$LOG_DIR`, else `$TEST_OUTPUT_DIR`, else a temp folder; the script prints where.
+- Each script also exits 1 on its own failure, so single runs are trustworthy too. A drive scenario's checks live in `_check_expectations()` in `tests/drive_test.gd`; add one there when you add a scenario, and add the scenario to `DRIVE_SCENARIOS` in `run_all.sh`.
+
+Individual tests (run `godot --headless --path . --import` once first; it generates `.godot/` and the `*.uid` / `*.import` files):
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
@@ -104,7 +112,7 @@ godot --headless --path . --import        # once, generates .godot/ and *.uid / 
 
 Gotchas:
 - **Headless physics runs in real time.** A 10 s scenario takes about 10 s, so run scenarios in parallel or in the background.
-- The tests print results, but **don't yet exit non-zero on failure**. Read the output: `RESULT: PASS`, `min upright`, `RESULT ... tier=`.
+- Exit codes are reliable: 0 = pass, 1 = a check failed. Every script prints a final `RESULT <test>: PASS|FAIL` line, and drive scenarios print each check as `  ok    ...` or `  FAIL  ...`.
 - In `--script` mode, the `Game` autoload **doesn't exist at compile or `_initialize` time**. Never write `Game.` or reference types that use it (such as `DeliveryMission`) in test scripts. Use `root.get_node("Game")` on the first frame.
 - GDScript can't infer types from Dictionary access. Write `var x: Vector3 = d.foo`, not `:=`.
 - Container screenshots use the software Compatibility renderer, so they look washed out compared with real hardware. That's expected.
