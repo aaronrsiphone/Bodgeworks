@@ -41,7 +41,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, six_propellers.json = power-budget test)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/getting-started.md  player/dev guide: install, controls, garage, missions, editing parts/maps
 docs/implementation-plan.md  roadmap; each item links to a GitHub issue
@@ -65,7 +65,7 @@ docs/.gdignore           keeps Godot from importing docs/
 
 **Part** (`data/parts.json`): `name`, `mass`, `buoyancy` (kg it can hold up under water; more than its mass means it floats) and `color`. Behaviour keys:
 - `seat: {}` — a vehicle needs one to drive.
-- `engine: {force, top_speed}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s).
+- `engine: {force, power}` — engines are summed into one budget. Total push = `min(force, power / speed)`, so power (W) sets the top speed and force (N) the standstill push.
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
 - `thrust: {force, steer, air}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
 
@@ -75,11 +75,12 @@ A part with no special look renders as a cube, so new parts need no code unless 
 
 - **Compile:** all parts become box colliders (except wheels) on one RigidBody3D. Mass, centre of mass (custom) and diagonal inertia are summed from the parts. The vehicle is shifted so its origin sits under the centre of mass horizontally.
   - No joints yet, so nothing can move relative to anything else.
+- **Power budget:** each tick the total push is shared by the consumers: every grounded wheel (weight 1) and every propeller (weight `lerp(air, 1, submerged)`). Push opposite to motion (reverse to brake) gets the full `force`. Test: `amphibian power` (6 propellers on one engine must be < 1.5× faster than 2).
 - **Wheels:** a ray from the mount, masked to `LAYER_WORLD` only, so wheels never climb onto crates.
   - Self-tuning spring and damper.
   - Tyre force (drive + rolling resistance + side grip) is clamped to `load * grip`, and **applied at axle height** to avoid wheelies and flips.
   - Wheels in front of the centre of mass steer. Steering lock shrinks with speed.
-- **Propellers:** force `thrust × lerp(air, 1, submerged) × throttle × taper`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
+- **Propellers:** their power share, capped at `thrust.force × lerp(air, 1, submerged)`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
 - **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
@@ -105,7 +106,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim>` | no |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power>` | no |
 | Garage clicks (10 checks) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- out_dir` | yes |

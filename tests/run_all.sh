@@ -31,6 +31,7 @@ DRIVE_SCENARIOS=(
 	"amphibian ramp"
 	"amphibian swim"
 	"forklift push"
+	"amphibian power"
 )
 
 names=()

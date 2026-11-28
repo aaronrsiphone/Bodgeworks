@@ -4,7 +4,11 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power"]
+# "power": swims the 2-propeller Amphibian, then a 6-propeller copy with the same ONE
+# engine, down the pond. The power budget means 6 propellers mustn't be much faster.
+const POWER_BLUEPRINTS := ["res://data/blueprints/amphibian.json", "res://tests/blueprints/six_propellers.json"]
+const POWER_SWAP_FRAME := 300 # each one swims for 5 s
 const VEHICLES := ["buggy", "amphibian", "forklift"]
 const FRAMES := 600
 
@@ -21,6 +25,8 @@ var crate_worst_ahead := -INF # from 2 s on, how far ahead the crate got at most
 var crate_closest_ahead := INF # ...and how close (negative = behind the vehicle)
 var crate_worst_side := 0.0 # ...and how far off to the side
 var failures := 0
+var speed_samples: Array[Vector2] = [] # (time s, forward distance m), for straight's cruise speed
+var power_top_kmh := [0.0, 0.0] # top swim speed of each "power" blueprint
 
 
 func _initialize() -> void:
@@ -50,6 +56,8 @@ func _physics_process(_delta: float) -> bool:
 	if v == null:
 		check(false, "the test map spawned a vehicle")
 		return _finish()
+	if scenario == "power" and (frame == 2 or frame == POWER_SWAP_FRAME):
+		v = _power_swap(v, 0 if frame == 2 else 1)
 	if frame == 2:
 		print("vehicle: %s  mass %.0f kg  COM %s  inertia %s" % [v.blueprint_name, v.mass, v.center_of_mass, v.inertia])
 		if scenario == "pond":
@@ -95,6 +103,12 @@ func _physics_process(_delta: float) -> bool:
 		"swim":
 			if frame > 30: Input.action_press("accelerate")
 			if frame > 120: Input.action_press("steer_left")
+		"power":
+			Input.action_press("accelerate")
+			var which := 0 if frame < POWER_SWAP_FRAME else 1
+			power_top_kmh[which] = maxf(power_top_kmh[which], v.speed_kmh())
+	if scenario == "straight" and frame % 30 == 0:
+		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
 	min_upright = minf(min_upright, v.global_basis.y.y)
 	if frame > 2:
 		var h := _heading(v)
@@ -122,6 +136,21 @@ func _physics_process(_delta: float) -> bool:
 	return false
 
 
+## "power" scenario: replace the map's vehicle with blueprint `which`, at the south end
+## of the pond facing north, and make it the one the controls drive.
+func _power_swap(old: Vehicle, which: int) -> Vehicle:
+	var v := Vehicle.new()
+	v.build(PartCatalog.load_blueprint(POWER_BLUEPRINTS[which]))
+	v.transform = Transform3D(Basis.IDENTITY, Vector3(40, 0, 8))
+	old.queue_free()
+	main.add_child(v)
+	main.vehicle = v
+	main.camera.target = v
+	start_pos = v.global_position
+	last_heading = _heading(v)
+	return v
+
+
 ## 0 = north, +90 = west (turned left).
 func _heading(v: Vehicle) -> float:
 	var fwd := -v.global_basis.z
@@ -136,6 +165,18 @@ func _check_expectations(v: Vehicle) -> void:
 	match scenario:
 		"straight":
 			check(moved >= 60.0, "travelled at least 60 m (%.1f m)" % moved)
+			if vehicle_arg == "buggy":
+				# Cruise speed over the last 2 s. Before the power budget (issue #6) it was
+				# about 45 km/h; it should stay within 10% of that.
+				var a: Vector2 = speed_samples[speed_samples.size() - 5]
+				var b: Vector2 = speed_samples[speed_samples.size() - 1]
+				var cruise := (b.y - a.y) / (b.x - a.x) * 3.6
+				check(cruise > 40.5 and cruise < 50.0, "cruise speed within 10%% of 45 km/h (%.1f km/h)" % cruise)
+		"power":
+			var ratio: float = power_top_kmh[1] / maxf(power_top_kmh[0], 0.1)
+			print("top swim speed: 2 propellers %.1f km/h, 6 propellers %.1f km/h (x%.2f)" % [power_top_kmh[0], power_top_kmh[1], ratio])
+			check(power_top_kmh[0] > 22.0 and power_top_kmh[0] < 32.0, "Amphibian swims at 22-32 km/h (%.1f km/h)" % power_top_kmh[0])
+			check(ratio < 1.5, "6 propellers on one engine are less than 1.5x faster than 2 (x%.2f)" % ratio)
 		"turn":
 			check(turned > 90.0, "turned left more than 90 deg (%.0f deg)" % turned)
 		"ramp":

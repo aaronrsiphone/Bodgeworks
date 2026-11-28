@@ -295,12 +295,15 @@ func _process(delta: float) -> void:
 func _update_info() -> void:
 	var mass := 0.0
 	var buoyancy := 0.0
+	var power := 0.0
 	var count := {}
 	for cell in parts:
 		var id: String = parts[cell].part
 		var def := PartCatalog.get_part(id)
 		mass += float(def.get("mass", 0))
 		buoyancy += float(def.get("buoyancy", 0))
+		if def.has("engine"):
+			power += float(def.engine.get("power", 0))
 		for behaviour in ["seat", "engine", "wheel", "thrust"]:
 			if def.has(behaviour):
 				count[behaviour] = count.get(behaviour, 0) + 1
@@ -309,6 +312,9 @@ func _update_info() -> void:
 	t += "Parts: %d / %d     Weight: %d kg\n" % [parts.size(), BUDGET, roundi(mass)]
 	if parts.size() > 0:
 		t += ("[color=#7fd4ff]Floats in water[/color]\n" if buoyancy > mass else "[color=#b0b0b0]Sinks in water[/color]\n")
+		# Power-to-weight: how much engine power each kg of vehicle gets.
+		# Higher = faster. Extra engines add power AND weight.
+		t += "Power: %d per kg\n" % roundi(power / mass)
 	if parts.is_empty():
 		t += "[color=#ffd070]Click the floor to start building![/color]\n"
 	else:
