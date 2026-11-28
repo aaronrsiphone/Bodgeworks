@@ -13,6 +13,21 @@
       "seconds": 0.5
     },
     {
+      "name": "garage_plane",
+      "scene": "res://garage/garage.tscn",
+      "blueprint": "res://data/blueprints/plane.json",
+      "camera": {"position": [-6, 6, 7], "look_at": [0, 0, 0.5]},
+      "seconds": 0.5
+    },
+    {
+      "name": "plane_flying",
+      "scene": "res://world/test_map.tscn",
+      "blueprint": "res://data/blueprints/plane.json",
+      "vehicle": {"position": [100, 1, 110], "yaw": 0},
+      "hold": ["accelerate"],
+      "seconds": 6.0
+    },
+    {
       "name": "test_map_overview",
       "scene": "res://world/test_map.tscn",
       "camera": {"position": [-30, 45, 50], "look_at": [15, 0, -30]},

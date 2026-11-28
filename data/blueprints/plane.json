@@ -1,0 +1,18 @@
+{
+  "_comment": "A small plane. The four propellers pull from the front of the wing, the wheels get it up to speed, the big wing lifts it, and the flat tail wings at the back keep its nose steady. Hold W on a long straight and it takes off by itself.",
+  "name": "Plane",
+  "parts": [
+    { "part": "propeller", "pos": [-3, 0, -1] }, { "part": "propeller", "pos": [-2, 0, -1] },
+    { "part": "propeller", "pos": [2, 0, -1] }, { "part": "propeller", "pos": [3, 0, -1] },
+    { "part": "engine", "pos": [0, 0, -1] },
+    { "part": "seat", "pos": [0, 1, -1] },
+    { "part": "wheel", "pos": [-1, 0, -1] }, { "part": "wheel", "pos": [1, 0, -1] },
+    { "part": "wing", "pos": [-3, 0, 0] }, { "part": "wing", "pos": [-2, 0, 0] }, { "part": "wing", "pos": [-1, 0, 0] },
+    { "part": "wing", "pos": [0, 0, 0] },
+    { "part": "wing", "pos": [1, 0, 0] }, { "part": "wing", "pos": [2, 0, 0] }, { "part": "wing", "pos": [3, 0, 0] },
+    { "part": "flat_wing", "pos": [0, 0, 1] },
+    { "part": "wheel", "pos": [-1, 0, 2] }, { "part": "wheel", "pos": [1, 0, 2] },
+    { "part": "flat_wing", "pos": [0, 0, 2] },
+    { "part": "flat_wing", "pos": [-1, 0, 3] }, { "part": "flat_wing", "pos": [0, 0, 3] }, { "part": "flat_wing", "pos": [1, 0, 3] }
+  ]
+}

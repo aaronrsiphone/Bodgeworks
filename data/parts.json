@@ -1,5 +1,5 @@
 {
-  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). A propeller's steer is how many degrees it swivels when you steer, and air is how much of its push it keeps out of the water (0.2 = a fifth). Add a new part by copying one and changing the numbers.",
+  "_comment": "The part catalog. Every part the game knows about lives here. mass is in kg. buoyancy is how many kg of weight the part can hold up when fully under water (more than its mass = it floats). A propeller's steer is how many degrees it swivels when you steer, and air is how much of its push it keeps out of the water (0.5 = half). A wing's area is its size in square metres (more area = more lift and drag), lift multiplies how strongly it lifts, stall is the angle in degrees where it stops lifting, and camber is how much it lifts when it's perfectly level (a curved wing lifts even when flat; a flat tail wing doesn't, which is what keeps a plane's nose steady). Add a new part by copying one and changing the numbers.",
 
   "block": {
     "name": "Wooden Block",
@@ -39,6 +39,20 @@
     "mass": 20,
     "buoyancy": 10,
     "color": "#3d8bd9",
-    "thrust": { "force": 2500, "steer": 30, "air": 0.2 }
+    "thrust": { "force": 2500, "steer": 30, "air": 0.5 }
+  },
+  "wing": {
+    "name": "Wing",
+    "mass": 15,
+    "buoyancy": 20,
+    "color": "#e8e4d8",
+    "wing": { "area": 1.0, "lift": 1.0, "stall": 15, "camber": 0.6 }
+  },
+  "flat_wing": {
+    "name": "Flat Wing",
+    "mass": 10,
+    "buoyancy": 15,
+    "color": "#a9c4d6",
+    "wing": { "area": 1.0, "lift": 1.0, "stall": 15, "camber": 0.0 }
   }
 }
