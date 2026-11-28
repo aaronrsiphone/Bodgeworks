@@ -180,3 +180,27 @@ The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `
   - `vision-required`: verifying the work means looking at rendered output (UI layout, level design, visuals, camera feel). Use a vision-capable agent and the screenshot tooling.
   - `no-vision`: verifiable from numbers and logs alone.
   - Area labels: `physics`, `garage`, `missions`, `progression`, `world`, `infra`, `visual`.
+
+## Working with issues, branches and PRs
+
+Several agents often work at once, and most of them touch the same few files (`data/parts.json`, `vehicle/vehicle.gd`, `garage/garage.gd`, `tests/drive_test.gd`, `tests/run_all.sh`, this file and `docs/getting-started.md`). Parallel PRs off `main` therefore conflict with each other. These rules keep that manageable.
+
+**Claim an issue before you start.**
+- Check the issue first. If it's assigned, or a recent comment says someone is on it, pick another issue or ask.
+- Claim it: assign it to yourself if you can, and also add a comment: "Working on this in branch `<branch>`" (with your session link if you have one). The comment counts even when assignment isn't possible.
+- If you stop without finishing, say so in a comment so someone else can pick it up.
+- Link the PR to the issue (`Closes #N` in the PR body).
+
+**One work branch per work window.** If you'll do several issues in a row, or one big feature:
+1. Create one work branch from the latest `main` and treat it as *your* main for the whole session.
+2. Do each issue on that branch, as its own commit or a small topic branch merged into it. Run `tests/run_all.sh` after each one.
+3. At the end, open **one** PR from the work branch to `main`. List every issue it closes, and what you decided where issues met (for example, two features both changing the same part).
+
+Don't open a separate PR per issue when the issues build on each other or touch the same files. The reviewer then has to merge them one by one and redo your conflict resolution.
+
+**Stacking on someone else's open PR.** If your work needs an unmerged PR, branch from that PR's branch, and say so at the top of your PR ("Stacked on #N, merge that first"). Don't merge other people's branches into yours just to keep up. If several open PRs need combining, leave that to one person or agent (usually the reviewer) so it happens once.
+
+**Before asking for review:**
+- Merge the latest `main` into your branch. Don't rebase or force-push a branch someone may have pulled.
+- Re-run `tests/run_all.sh`. If you changed anything visible, re-run `tests/screenshot.gd` too.
+- Small, independent fixes (a typo, a doc line, one test) can still be their own PR straight off `main`.
