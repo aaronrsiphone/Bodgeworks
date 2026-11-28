@@ -154,6 +154,12 @@ Try a monster-grip wheel, or a float that makes things fly out of the water.
 
 Open `world/test_map.tscn`. The ground, ramps and pond are **CSG** boxes and spheres. Select one, then drag it, resize it, or duplicate it (Ctrl+D). Anything under the `Ground` node is merged into one solid floor, and setting a box's *Operation* to **Subtraction** digs a hole. To move the pond, move the `PondPit` box and the `Pond` water node together.
 
+## The design kit
+
+Open `showcase/showcase.tscn` and press **F6** to see the Bodgeworks look: every kit part (blocks, beams, wheels, wings, propellers and more) and five starter platforms (a rover, a submarine, a plane, a helicopter and a boat). Right-drag or use the arrow keys to look round, scroll to zoom, and press **Space** to jump to the next one. The propellers spin.
+
+They're just for looking at so far: you can't drive them yet.
+
 ## Where things live
 
 ```
@@ -171,6 +177,8 @@ world/main.gd          spawns the vehicle and reads your controls
 world/input_setup.gd   the key and gamepad bindings
 world/water.gd         the pond (anything inside it gets buoyancy)
 camera/chase_camera.gd the follow camera
+kit/                   the design kit: the concept-art look, built in code (parts and vehicle platforms)
+showcase/              a scene that shows off the design kit
 tests/                 automated checks that run without a screen
 docs/spec/             the design spec and architecture (a starting point, not gospel)
 ```

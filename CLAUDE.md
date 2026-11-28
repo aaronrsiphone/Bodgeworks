@@ -43,6 +43,13 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
                               children; timer starts on first throttle; medals; T restarts
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
+kit/kit.gd               Kit: the DESIGN KIT, the concept-art look built in code: palette (colour = job),
+                         bolt/socket/hardpoint details, and parts (block, beam, truss, plate, wheel, pontoon,
+                         propeller, ducted fan, engine, wing, fin, tank, seat, dome, porthole, lamp); looks only
+kit/kit_mesh.gd          KitMesh: mesh builders: rounded_box, lathe (spun outline), loft (swept outline), airfoil
+kit/platforms.gd         Platforms: rover, submarine, plane, helicopter, boat, snapped together from Kit parts
+                         (looks only: no blueprint or physics yet)
+showcase/showcase.tscn   shows every kit part and platform (F6; Space jumps between them); presets showcase_*
 tests/                   headless/xvfb test scripts (see Testing)
 tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, carrier.json = 2×2 tray bed, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test, buggy_tank.json = buggy + fuel tank, winged_buggy.json = jump test)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
@@ -167,9 +174,21 @@ Presets live in `tests/screenshot_presets.json`. Each one loads its scene fresh.
 | `action` | Scripted action run before simulating: `deliver_cargo` (drops the mission cargo into the goal; `mission_time` sets the clock shown), `wire_mode` (garage: shows the button badges), `press_button` (test map: presses accessory `button` after `after` seconds). |
 | `seconds` | How long to simulate before the shot. |
 
-The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `garage_plane`, `garage_wiring`, `plane_flying`, `hopper_jump`, `test_map_overview`, `pond`, `mission_start` and `mission_result`. The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
+The current presets are `garage_overview`, `garage_closeup`, `garage_carrier`, `garage_plane`, `garage_wiring`, `plane_flying`, `hopper_jump`, `test_map_overview`, `pond`, `mission_start`, `mission_result`, and the design kit's `showcase_parts`, `showcase_parts_left`, `showcase_parts_right`, `showcase_platforms` and `showcase_<platform>` (rover, submarine, plane, helicopter, boat). The tool sets `Game.persist = false`, so staged results never overwrite the player's real best times.
 
 **Colours look flatter than on real hardware.** Under xvfb, Godot runs the Compatibility (OpenGL) renderer on llvmpipe (software rendering): no Forward+ lighting, weaker shading, and distant ground washes out in the fog. Judge layout, framing, UI and presence of objects, not exact colour or lighting quality.
+
+## Design kit (kit/)
+
+The look from `docs/concept-art/`, built in GDScript (no Blender: the cloud sandbox wouldn't allow downloading it). Rules for new kit parts:
+- Rounded edges everywhere (`Kit.rbox`, or `KitMesh.lathe`/`loft` with bevelled outlines). Nothing sharp-cornered.
+- A grey `Kit.hardpoint` (socket plus four bolts) wherever parts join.
+- Colour says the job: `YELLOW` structure, `BLUE` air/water surfaces and propellers, `RED` propulsion, `GREY` mechanisms. `CREAM` stripes, `ORANGE` accents.
+- Centred on its grid cell, forward −Z, up +Y. A spinning bit is a child called `Spinner` that turns round its Z (or its `spin_axis` meta).
+- `KitMesh._tri` fixes triangle winding from an "outward" direction, so builders never worry about clockwise order.
+- Check new parts with `tests/screenshot.gd -- res://showcase/showcase.tscn <dir>`.
+
+The kit isn't wired into the game yet. `PartVisuals` still draws the in-game parts.
 
 ## Conventions
 

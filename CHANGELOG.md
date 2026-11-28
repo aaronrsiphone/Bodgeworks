@@ -2,6 +2,14 @@
 
 All the notable changes to Bodgeworks, newest first. We don't have version numbers yet, so each heading is a date and a short name. Each one says what you can now do in the game. The "Under the hood" bits are for people working on the code.
 
+## 2026-11-28 — Design kit
+
+### Added
+- **The design kit showcase** (`showcase/showcase.tscn`, press F6). It shows the look from the concept art: chunky parts with rounded edges, grey bolted hardpoints where things join, and colours that say what a part does. It has 16 parts and five starter platforms: a rover, a submarine, a plane, a helicopter and a boat. They're for looking at only; you can't drive them yet.
+
+### Under the hood
+- `kit/kit_mesh.gd` builds rounded boxes, lathed shapes and lofted wings in code. `kit/kit.gd` holds the parts and colours, and `kit/platforms.gd` puts the vehicles together. There are new `showcase_*` screenshot presets.
+
 ## 2026-11-28 — Planes, springs and fuel (#43)
 
 This one combined seven smaller pieces of work into one go (they replaced PRs #36 to #40 and #42, because they all changed the same files).
