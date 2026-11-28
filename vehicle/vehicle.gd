@@ -8,6 +8,8 @@ extends RigidBody3D
 ##   wheels     -> raycast suspension, drive, grip
 ##   propellers -> thrust
 ##   everything -> buoyancy and drag when it is under water
+## Parts wired to an accessory button (1/2/3) also do something when it's pressed:
+##   springs    -> kick the ground or a crate
 ## Pushing at the part's position (not the middle) is what makes off-centre
 ## thrust turn you and heavy parts tip you.
 
@@ -34,6 +36,8 @@ var thrusters: Array[Dictionary] = []
 var engine_force := 0.0
 var top_speed := 0.0
 var has_seat := false
+## Accessory buttons: button number (1-3) -> the parts wired to it.
+var buttons := {}
 
 var _steer_angle := 0.0
 var _spring := 0.0
@@ -62,7 +66,8 @@ func build(blueprint: Dictionary) -> void:
 			"id": entry["part"],
 			"def": def,
 			"pos": Vector3(cell[0], cell[1], cell[2]) * CELL,
-			"basis": Basis(Vector3.UP, int(entry.get("rot", 0)) * PI / 2.0),
+			"basis": PartCatalog.rot_basis(int(entry.get("rot", 0))),
+			"button": int(entry.get("button", 0)), # 0 = not wired to a button
 			"mass": float(def.get("mass", 10)),
 			"buoyancy": float(def.get("buoyancy", 0)),
 		}
@@ -189,6 +194,103 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 		p["swivel"] = deg_to_rad(float(def.thrust.get("steer", 0)))
 		p["air"] = float(def.thrust.get("air", 1.0))
 		thrusters.append(p)
+	if def.has("spring"):
+		p["cooldown_left"] = 0.0 # seconds until it can kick again
+		p["kick_time"] = 99.0 # seconds since it last kicked (drives the animation)
+	if p.button > 0 and PartCatalog.uses_button(def):
+		if not buttons.has(p.button):
+			buttons[p.button] = []
+		buttons[p.button].append(p)
+
+
+# --- accessory buttons -------------------------------------------------------
+# main.gd calls press_button(n) when you press 1/2/3. Every part wired to that
+# button gets activated in the next physics tick. To add a new kind of
+# button part: add its behaviour name to PartCatalog.BUTTON_BEHAVIOURS and
+# write an _activate_<name>(part) function below. That's all.
+
+var _pressed: Array[int] = []
+
+
+## Press accessory button n (1-3). Safe to call any time; the work happens in the physics tick.
+func press_button(n: int) -> void:
+	if buttons.has(n) and n not in _pressed:
+		_pressed.append(n)
+
+
+## What the buttons do, for the HUD: "1 Spring x2" and so on.
+func button_summary() -> Array[String]:
+	var out: Array[String] = []
+	var keys := buttons.keys()
+	keys.sort()
+	for n in keys:
+		var names := {}
+		for p in buttons[n]:
+			var part_name: String = p.def.get("name", p.id)
+			names[part_name] = names.get(part_name, 0) + 1
+		var bits: Array[String] = []
+		for part_name in names:
+			bits.append(part_name if names[part_name] == 1 else "%s x%d" % [part_name, names[part_name]])
+		out.append("%d  %s" % [n, ", ".join(bits)])
+	return out
+
+
+func _run_buttons(delta: float) -> void:
+	for n in _pressed:
+		for p in buttons[n]:
+			for behaviour in PartCatalog.BUTTON_BEHAVIOURS:
+				if p.def.has(behaviour):
+					call("_activate_" + behaviour, p)
+	_pressed.clear()
+	for p in parts:
+		if p.def.has("spring"):
+			_animate_spring(p, delta)
+
+
+## Spring: shoot the foot out along the part's facing. If it hits the ground,
+## the vehicle gets shoved the other way (point it down to jump). If it hits a
+## crate, the crate gets kicked and the vehicle feels the kick back.
+func _activate_spring(p: Dictionary) -> void:
+	if p.cooldown_left > 0.0:
+		return
+	var s: Dictionary = p.def.spring
+	p.cooldown_left = float(s.get("cooldown", 1.0))
+	p.kick_time = 0.0
+	var at := to_global(p.pos)
+	var dir: Vector3 = global_basis * (p.basis * Vector3.FORWARD)
+	# Look from the middle of the part to past its face, as far as the foot reaches.
+	var query := PhysicsRayQueryParameters3D.create(at, at + dir * (CELL * 0.5 + float(s.get("reach", 1.0))))
+	query.collision_mask = LAYER_WORLD | LAYER_PROPS | LAYER_VEHICLES
+	query.exclude = [get_rid()] # don't kick ourselves
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return # kicked thin air: looks fun, does nothing
+	var impulse := float(s.get("impulse", 4000))
+	var other = hit.collider
+	if other is RigidBody3D:
+		# Equal and opposite, but a light crate can only fly so fast,
+		# otherwise a 40 kg crate would leave at 100 m/s.
+		impulse = minf(impulse, other.mass * float(s.get("kick_speed", 12)))
+		other.apply_impulse(dir * impulse, hit.position - other.global_position)
+	apply_impulse(-dir * impulse, at - global_position)
+
+
+func _animate_spring(p: Dictionary, delta: float) -> void:
+	p.cooldown_left = maxf(p.cooldown_left - delta, 0.0)
+	p.kick_time += delta
+	# Shoot out fast (0.08 s), then slowly pull back in (0.3 s).
+	var out := 0.0
+	if p.kick_time < 0.08:
+		out = p.kick_time / 0.08
+	elif p.kick_time < 0.38:
+		out = 1.0 - (p.kick_time - 0.08) / 0.3
+	var stretch: float = out * float(p.def.spring.get("reach", 1.0)) * 0.6
+	var foot: Node3D = p.root.get_node_or_null("Foot")
+	var coil: Node3D = p.root.get_node_or_null("Coil")
+	if foot:
+		foot.position.z = -0.38 - stretch
+	if coil:
+		coil.scale.z = 1.0 + stretch / 0.55
 
 
 func _physics_process(delta: float) -> void:
@@ -210,6 +312,7 @@ func _physics_process(delta: float) -> void:
 	_steer_angle = move_toward(_steer_angle, steer * max_steer, delta * 2.5)
 
 	_apply_wheels(delta, up, com_global, taper if powered else 0.0)
+	_run_buttons(delta)
 
 	# Propellers push along their facing direction, at their position.
 	# They swivel when you steer, like an outboard motor. One behind the middle
