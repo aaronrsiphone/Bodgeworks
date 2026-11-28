@@ -28,20 +28,24 @@ static func create(id: String, def: Dictionary) -> Node3D:
 			first = false
 		return root
 
+	if def.has("thrust"):
+		# Any propeller: a hub and two blades. "blade" in parts.json sets their length.
+		var blade := float(def.thrust.get("blade", 0.9))
+		root.add_child(cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
+		var blades := Node3D.new()
+		blades.name = "Spinner"
+		blades.position = Vector3(0, 0, 0.3)
+		blades.add_child(box(Vector3(blade, 0.12, 0.05), Vector3.ZERO, color))
+		blades.add_child(box(Vector3(0.12, blade, 0.05), Vector3.ZERO, color))
+		root.add_child(blades)
+		return root
+
 	match id:
 		"seat":
 			root.add_child(box(Vector3(0.9, 0.3, 0.9), Vector3(0, -0.35, 0), color))
 			root.add_child(box(Vector3(0.9, 0.8, 0.2), Vector3(0, 0.05, 0.35), color))
 		"float":
 			root.add_child(cylinder(0.45, 0.95, color, Vector3(PI / 2, 0, 0)))
-		"propeller":
-			root.add_child(cylinder(0.15, 0.6, Color("#5a6270"), Vector3(PI / 2, 0, 0)))
-			var blades := Node3D.new()
-			blades.name = "Spinner"
-			blades.position = Vector3(0, 0, 0.3)
-			blades.add_child(box(Vector3(0.9, 0.12, 0.05), Vector3.ZERO, color))
-			blades.add_child(box(Vector3(0.12, 0.9, 0.05), Vector3.ZERO, color))
-			root.add_child(blades)
 		"engine":
 			root.add_child(box(Vector3(0.9, 0.7, 0.9), Vector3(0, -0.15, 0), color))
 			root.add_child(cylinder(0.08, 0.5, Color("#333333"), Vector3.ZERO, Vector3(0.25, 0.35, 0.3)))
