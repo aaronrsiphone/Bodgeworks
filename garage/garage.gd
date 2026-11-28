@@ -6,6 +6,7 @@ extends Node3D
 ##   Right drag   turn the camera      Scroll  zoom      Middle drag  slide
 ##   1-9          pick a part          R       rotate the part
 ##   Ctrl+Z       undo                 G       test drive
+##   M            mirror mode: every part you add or remove gets a twin on the other side
 
 const BUDGET := 60 # most parts a vehicle can have
 const LIMIT := 12 # how far from the middle you can build (in cells)
@@ -20,8 +21,16 @@ var part_ids: Array[String] = []
 var selected := ""
 var rot := 0
 
+## Mirror mode. The mirror line sits at x = mirror_x2 / 2. We store it doubled so it is
+## always a whole number: even = through the middle of a cell, odd = on the edge between two.
+var mirror_on := false
+var mirror_x2 := 0
+
 var _undo: Array = []
 var _ghost: Node3D
+var _mirror_ghost: Node3D # the twin ghost on the other side of the mirror line
+var _mirror_line: MeshInstance3D
+var _mirror_button: Button
 var _ghost_cell := Vector3i.ZERO
 var _ghost_ok := false
 var _ghost_reason := ""
@@ -51,6 +60,7 @@ func _ready() -> void:
 		_changed()
 	else:
 		_load_blueprint(Game.blueprint)
+	_build_mirror_line()
 	_select(part_ids[0])
 
 
@@ -85,25 +95,105 @@ func clear() -> void:
 
 
 ## Why a part can't go in this cell, or "" if it can.
-func why_not(cell: Vector3i) -> String:
-	if parts.has(cell):
+## `pending` lists cells that are about to be filled at the same time (the mirror twin),
+## so they count as taken, count towards the budget, and count as "touching".
+func why_not(cell: Vector3i, pending: Array = []) -> String:
+	if parts.has(cell) or pending.has(cell):
 		return "There's already a part there"
 	if cell.y < 0:
 		return "Can't build under the floor"
 	if absi(cell.x) > LIMIT or absi(cell.z) > LIMIT or cell.y > LIMIT:
 		return "Too far from the middle"
-	if parts.size() >= BUDGET:
+	if parts.size() + pending.size() >= BUDGET:
 		return "Part budget is full (%d)" % BUDGET
-	if not parts.is_empty() and not _touches_build(cell):
+	if not (parts.is_empty() and pending.is_empty()) and not _touches_build(cell, pending):
 		return "Parts have to touch your vehicle"
 	return ""
 
 
-func _touches_build(cell: Vector3i) -> bool:
+## Why a part (and, in mirror mode, its twin) can't go here, or "" if both can.
+func why_not_pair(cell: Vector3i) -> String:
+	var reason := why_not(cell)
+	if reason != "" or not mirror_on:
+		return reason
+	var twin := mirror_cell(cell)
+	if twin == cell:
+		return "" # sitting right on the mirror line: there's only one part
+	reason = why_not(twin, [cell])
+	if reason != "":
+		return "Mirror side: " + reason
+	return ""
+
+
+func _touches_build(cell: Vector3i, pending: Array = []) -> bool:
 	for d in [Vector3i.LEFT, Vector3i.RIGHT, Vector3i.UP, Vector3i.DOWN, Vector3i.FORWARD, Vector3i.BACK]:
-		if parts.has(cell + d):
+		if parts.has(cell + d) or pending.has(cell + d):
 			return true
 	return false
+
+
+# --- mirror mode -------------------------------------------------------------
+
+## The cell on the other side of the mirror line.
+func mirror_cell(cell: Vector3i) -> Vector3i:
+	return Vector3i(mirror_x2 - cell.x, cell.y, cell.z)
+
+
+## A mirror swaps left and right, so a part turned to face left (1) faces right (3) in
+## the mirror. Facing forward (0) or backward (2) stays the same.
+static func mirror_rot(r: int) -> int:
+	return (4 - r) % 4
+
+
+func set_mirror(on: bool) -> void:
+	mirror_on = on
+	if on:
+		# Put the line halfway between the leftmost and rightmost parts. min + max is
+		# always whole, so the line lands on a cell middle or a cell edge.
+		if parts.is_empty():
+			mirror_x2 = 0
+		else:
+			var lo := 1000
+			var hi := -1000
+			for cell in parts:
+				lo = mini(lo, cell.x)
+				hi = maxi(hi, cell.x)
+			mirror_x2 = lo + hi
+		_say("Mirror on")
+	else:
+		_say("Mirror off")
+	if _mirror_button:
+		_mirror_button.set_pressed_no_signal(on)
+	_mirror_line.visible = on
+	_mirror_line.position.x = mirror_x2 / 2.0
+	_update_ghost()
+
+
+func _build_mirror_line() -> void:
+	# A thin glowing strip on the floor, plus a faint see-through wall above it.
+	_mirror_line = MeshInstance3D.new()
+	var strip := BoxMesh.new()
+	strip.size = Vector3(0.08, 0.02, LIMIT * 2 + 1)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.4, 0.85, 1.0, 0.8)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	strip.material = m
+	_mirror_line.mesh = strip
+	_mirror_line.position = Vector3(0, FLOOR_Y + 0.02, 0)
+	var wall := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(LIMIT * 2 + 1, 3.0)
+	var wm := m.duplicate()
+	wm.albedo_color = Color(0.4, 0.85, 1.0, 0.08)
+	wm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	quad.material = wm
+	wall.mesh = quad
+	wall.basis = Basis(Vector3.UP, PI / 2.0) # face sideways, along the x axis
+	wall.position.y = 1.5
+	_mirror_line.add_child(wall)
+	_mirror_line.visible = false
+	add_child(_mirror_line)
 
 
 func to_blueprint() -> Dictionary:
@@ -171,6 +261,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_R:
 			rot = (rot + 1) % 4
 			_update_ghost()
+		elif event.keycode == KEY_M:
+			set_mirror(not mirror_on)
 		elif event.keycode >= KEY_1 and event.keycode <= KEY_9:
 			var i: int = event.keycode - KEY_1
 			if i < part_ids.size():
@@ -186,17 +278,40 @@ func _try_place() -> void:
 	if not _ghost_ok:
 		_say(_ghost_reason)
 		return
+	build_at(_ghost_cell)
+
+
+## Add the selected part at `cell` (and its mirror twin). One undo step takes both away.
+func build_at(cell: Vector3i) -> bool:
+	var reason := why_not_pair(cell)
+	if reason != "":
+		_say(reason)
+		return false
 	_snapshot()
-	place(_ghost_cell, selected, rot)
+	place(cell, selected, rot)
+	if mirror_on and mirror_cell(cell) != cell:
+		place(mirror_cell(cell), selected, mirror_rot(rot))
 	_changed()
+	return true
 
 
 func _try_remove() -> void:
 	var hit := _pick()
 	if hit.has("part_cell"):
-		_snapshot()
-		remove(hit.part_cell)
-		_changed()
+		remove_at(hit.part_cell)
+
+
+## Remove the part at `cell`. In mirror mode its twin goes too, if the same kind of
+## part is sitting in the mirror cell. One undo step brings both back.
+func remove_at(cell: Vector3i) -> void:
+	if not parts.has(cell):
+		return
+	_snapshot()
+	var twin := mirror_cell(cell)
+	if mirror_on and twin != cell and parts.has(twin) and parts[twin].part == parts[cell].part:
+		remove(twin)
+	remove(cell)
+	_changed()
 
 
 ## What's under the mouse: the part it's over (if any) and the cell a new part would go in.
@@ -232,33 +347,46 @@ func _update_ghost() -> void:
 	var hit := {} if over_ui else _pick()
 	if not hit.has("place_cell"):
 		_ghost.visible = false
+		_mirror_ghost.visible = false
 		return
 	_ghost.visible = true
 	_ghost_cell = hit.place_cell
 	_ghost.position = Vector3(_ghost_cell)
 	var r := 0 if PartCatalog.get_part(selected).has("wheel") else rot
 	_ghost.basis = Basis(Vector3.UP, r * PI / 2.0)
-	_ghost_reason = why_not(_ghost_cell)
+	_ghost_reason = why_not_pair(_ghost_cell)
 	_ghost_ok = _ghost_reason == ""
-	for mi in _ghost.find_children("*", "MeshInstance3D", true, false):
-		mi.material_override = mi.get_meta("ghost_material") if _ghost_ok else _bad_material
+	var twin := mirror_cell(_ghost_cell)
+	_mirror_ghost.visible = mirror_on and twin != _ghost_cell
+	_mirror_ghost.position = Vector3(twin)
+	_mirror_ghost.basis = Basis(Vector3.UP, mirror_rot(r) * PI / 2.0)
+	for g in [_ghost, _mirror_ghost]:
+		for mi in g.find_children("*", "MeshInstance3D", true, false):
+			mi.material_override = mi.get_meta("ghost_material") if _ghost_ok else _bad_material
 
 
 func _select(id: String) -> void:
 	selected = id
 	if _ghost:
 		_ghost.queue_free()
-	_ghost = PartVisuals.create(id, PartCatalog.get_part(id))
-	# See-through copy of each piece's colour.
-	for mi in _ghost.find_children("*", "MeshInstance3D", true, false):
+		_mirror_ghost.queue_free()
+	_ghost = _make_ghost(id)
+	_mirror_ghost = _make_ghost(id)
+	for pid in _part_buttons:
+		_part_buttons[pid].button_pressed = pid == id
+	_update_ghost()
+
+
+## A see-through copy of a part, to show where it will go.
+func _make_ghost(id: String) -> Node3D:
+	var ghost := PartVisuals.create(id, PartCatalog.get_part(id))
+	for mi in ghost.find_children("*", "MeshInstance3D", true, false):
 		var m: StandardMaterial3D = mi.mesh.material.duplicate()
 		m.albedo_color.a = 0.5
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mi.set_meta("ghost_material", m)
-	add_child(_ghost)
-	for pid in _part_buttons:
-		_part_buttons[pid].button_pressed = pid == id
-	_update_ghost()
+	add_child(ghost)
+	return ghost
 
 
 func _start_mission(id: String) -> void:
@@ -355,7 +483,7 @@ func _build_ui() -> void:
 	top.alignment = BoxContainer.ALIGNMENT_END
 	top.anchor_left = 1.0
 	top.anchor_right = 1.0
-	top.offset_left = -900
+	top.offset_left = -1000
 	top.offset_right = -16
 	top.offset_top = 12
 	top.offset_bottom = 52
@@ -374,6 +502,8 @@ func _build_ui() -> void:
 	top.add_child(_load_menu)
 	_refresh_load_menu()
 	_button(top, "Undo", undo)
+	_mirror_button = _button(top, "Mirror (M)", func(): set_mirror(not mirror_on))
+	_mirror_button.toggle_mode = true
 	_button(top, "Clear", func():
 		_snapshot()
 		clear()
@@ -425,7 +555,7 @@ func _build_ui() -> void:
 		_part_buttons[id] = b
 
 	var help := Label.new()
-	help.text = "Left click: add part     Right click: remove     Right drag: turn camera     Scroll: zoom     R: rotate     Ctrl+Z: undo"
+	help.text = "Left click: add part     Right click: remove     Right drag: turn camera     Scroll: zoom     R: rotate     M: mirror     Ctrl+Z: undo"
 	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	help.anchor_top = 1.0
 	help.anchor_bottom = 1.0

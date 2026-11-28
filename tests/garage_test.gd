@@ -48,6 +48,34 @@ func _process(_delta: float) -> bool:
 		_key(KEY_G)
 	if frame == 120:
 		check(current_scene.name == "Garage" and current_scene.parts.size() == 14, "G went back to the garage with the build kept")
+		# Mirror mode. The build spans x = -1 .. 2, so the mirror line is at x = 0.5
+		# (stored doubled as mirror_x2 = 1) and cell x mirrors to 1 - x.
+		garage = current_scene
+		_key(KEY_M)
+		_select_key(KEY_1) # block
+	if frame == 125:
+		check(garage.mirror_on and garage.mirror_x2 == 1, "M turned mirror on with the line at x = 0.5 (x2 = %d)" % garage.mirror_x2)
+		check(garage.mirror_rot(1) == 3 and garage.mirror_rot(3) == 1 and garage.mirror_rot(0) == 0, "mirrored rotation swaps left and right")
+		# Fill the gap between the left wheels so (-2,0,1) has something to touch.
+		garage.build_at(Vector3i(-1, 0, 1))
+		check(garage.parts.has(Vector3i(-1, 0, 1)) and garage.parts.has(Vector3i(2, 0, 1)), "mirror placed a twin at (2,0,1)")
+		garage.build_at(Vector3i(-2, 0, 1))
+	if frame == 130:
+		check(garage.parts.has(Vector3i(-2, 0, 1)) and garage.parts.has(Vector3i(3, 0, 1)), "placing at (-2,0,1) also filled the mirrored cell (3,0,1)")
+		check(garage.parts.size() == 18, "four parts added as two pairs (18), got %d" % garage.parts.size())
+		_shot("garage_04_mirror.png")
+		_key(KEY_Z, true)
+	if frame == 135:
+		check(not garage.parts.has(Vector3i(-2, 0, 1)) and not garage.parts.has(Vector3i(3, 0, 1)), "one ctrl+z removed both mirrored parts")
+		check(garage.parts.has(Vector3i(-1, 0, 1)) and garage.parts.has(Vector3i(2, 0, 1)), "...and kept the earlier pair")
+		check(garage.why_not_pair(Vector3i(-2, 0, 3)) != "", "a pair is refused when it doesn't touch the vehicle")
+		garage.remove_at(Vector3i(2, 0, 1))
+		check(not garage.parts.has(Vector3i(-1, 0, 1)) and not garage.parts.has(Vector3i(2, 0, 1)), "removing a part also removed its twin")
+		_key(KEY_M)
+	if frame == 140:
+		check(not garage.mirror_on, "M turned mirror off again")
+		garage.build_at(Vector3i(-1, 0, 1))
+		check(garage.parts.has(Vector3i(-1, 0, 1)) and not garage.parts.has(Vector3i(2, 0, 1)), "with mirror off only one part is placed")
 		print("RESULT garage: %s" % ("PASS" if failures == 0 else "FAIL (%d)" % failures))
 		quit(1 if failures > 0 else 0)
 		return true
