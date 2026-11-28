@@ -124,7 +124,7 @@ Gotchas:
 `tests/screenshot.gd` renders PNG screenshots of any scene from named camera presets. Use it to check UI, levels and visuals, and to attach before/after images to PRs (issues labelled `vision-required`).
 
 ```
-xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility \
+xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 \
     --script res://tests/screenshot.gd -- <scene|all> <out_dir> [preset...]
 ```
 

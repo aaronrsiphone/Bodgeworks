@@ -2,7 +2,7 @@ extends SceneTree
 ## Renders PNG screenshots of any scene, from camera presets in tests/screenshot_presets.json.
 ## Needs a display (not --headless). On a server, run it under xvfb-run:
 ##
-##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility \
+##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 \
 ##       --script res://tests/screenshot.gd -- <scene|all> <out_dir> [preset...]
 ##
 ##   all                         every preset in the file
