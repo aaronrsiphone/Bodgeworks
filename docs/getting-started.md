@@ -136,18 +136,26 @@ tests/                 automated checks that run without a screen
 docs/spec/             the design spec and architecture (a starting point, not gospel)
 ```
 
-## Automated test (optional)
+## Automated tests (optional)
 
-This drives the car without opening a window and prints what happens:
+Run them all with one command. It prints PASS or FAIL for each test, and exits with an error if anything failed:
+
+```
+GODOT=/path/to/godot tests/run_all.sh
+```
+
+It takes about 30 seconds, because the driving tests run at the same time. The garage test needs a window, so on a computer without a screen it runs under `xvfb-run` (and is skipped if that isn't installed). Each test's full log is saved; the script prints where.
+
+You can also run one test on its own. This drives the car without opening a window, prints what happens, then checks it (for example, `straight` must cover at least 60 m without tipping over):
 
 ```
 godot --headless --path . --script res://tests/drive_test.gd -- buggy straight
 godot --headless --path . --script res://tests/drive_test.gd -- amphibian ramp
 ```
 
-The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates) and `swim` (steer in the pond). Use `forklift` instead of `buggy` to try the test vehicle with forks.
+The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates) and `swim` (steer in the pond). Use `forklift` instead of `buggy` to try the test vehicle with forks. The checks are at the bottom of `tests/drive_test.gd`, in `_check_expectations()`.
 
-An autopilot can play the delivery mission and report the time:
+An autopilot can play the delivery mission and report the time. It fails if it doesn't finish, or is slower than silver:
 
 ```
 godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json
