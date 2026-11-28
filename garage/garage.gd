@@ -566,7 +566,7 @@ func _update_info() -> void:
 		var f := Vehicle.fuel_for(defs)
 		var secs := Vehicle.fuel_seconds(f.capacity, f.use)
 		if f.use > 0.0:
-			t += "Fuel: %d s at full throttle%s\n" % [roundi(secs), "" if f.tanks > 0 else " (seat reserve; add a Fuel Tank for more)"]
+			t += "Fuel: %d s at full throttle%s\n" % [roundi(secs), "" if f.tanks > 0 else " (seat reserve; a Fuel Tank adds more)"]
 		if not count.has("wheel") and not count.has("thrust"):
 			t += "[color=#ff8080]No wheels or propellers: it can't move![/color]\n"
 		if count.has("unwired"):
@@ -663,38 +663,49 @@ func _build_ui() -> void:
 				b.icon = _medal_icon(Game.TIER_COLORS[best.tier])
 
 	# Bottom: one button per part.
-	var bar := HBoxContainer.new()
+	# Bottom of the screen: the help line, then the part buttons. The buttons wrap
+	# onto more rows when there are too many for one, and the whole box grows
+	# upwards, so every part stays on screen however many parts.json has.
+	var bottom := VBoxContainer.new()
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.anchor_top = 1.0
+	bottom.anchor_bottom = 1.0
+	bottom.anchor_right = 1.0
+	bottom.offset_left = 8
+	bottom.offset_right = -8
+	bottom.offset_top = -12
+	bottom.offset_bottom = -12
+	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bottom.add_theme_constant_override("separation", 6)
+	ui.add_child(bottom)
+	var bar := HFlowContainer.new()
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.alignment = BoxContainer.ALIGNMENT_CENTER
-	bar.anchor_top = 1.0
-	bar.anchor_bottom = 1.0
-	bar.anchor_right = 1.0
-	bar.offset_top = -64
-	bar.offset_bottom = -16
-	ui.add_child(bar)
+	bar.alignment = FlowContainer.ALIGNMENT_CENTER
+	bar.add_theme_constant_override("h_separation", 4)
+	bar.add_theme_constant_override("v_separation", 4)
 	for i in part_ids.size():
 		var id := part_ids[i]
 		var def := PartCatalog.get_part(id)
-		var b := _button(bar, "%d  %s" % [i + 1, def.get("name", id)], _select.bind(id))
+		# Keys 1-9 pick the first nine parts; the rest are click-only, so no number.
+		var label: String = def.get("name", id)
+		if i < 9:
+			label = "%d  %s" % [i + 1, label]
+		var b := _button(bar, label, _select.bind(id))
 		b.toggle_mode = true
 		b.icon = PartVisuals.icon(def)
-		b.custom_minimum_size.y = 44
+		b.custom_minimum_size.y = 40
 		_part_buttons[id] = b
 
 	var help := Label.new()
 	_help = help
 	help.text = _help_text()
 	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	help.anchor_top = 1.0
-	help.anchor_bottom = 1.0
-	help.anchor_right = 1.0
-	help.offset_top = -96
-	help.offset_bottom = -70
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.add_theme_font_size_override("font_size", 15)
 	help.add_theme_constant_override("outline_size", 5)
 	help.add_theme_color_override("font_outline_color", Color.BLACK)
-	ui.add_child(help)
+	bottom.add_child(help)
+	bottom.add_child(bar) # after the help line, so the buttons sit at the very bottom
 
 	_toast = Label.new()
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
