@@ -158,3 +158,11 @@ The garage test clicks around like a player would, so it needs a window:
 ```
 godot --path . --script res://tests/garage_test.gd
 ```
+
+To take screenshots of the garage, the test map, the pond and the mission (they go in the `shots` folder):
+
+```
+godot --path . --script res://tests/screenshot.gd -- all shots
+```
+
+The camera spots are in `tests/screenshot_presets.json`. Add your own there.

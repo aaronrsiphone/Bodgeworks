@@ -18,6 +18,8 @@ var blueprint: Dictionary = {}
 ## The mission scene to play in the test map, or "" for free driving.
 var mission_scene := ""
 var save := {"missions": {}}
+## False keeps results in memory only (tools that stage results set this).
+var persist := true
 
 
 func _ready() -> void:
@@ -67,6 +69,8 @@ func record_result(id: String, time: float, tier: String) -> bool:
 	if not old.is_empty() and float(old.time) <= time:
 		return false
 	save.missions[id] = {"time": time, "tier": tier, "vehicle": blueprint.get("name", "")}
+	if not persist:
+		return true
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(save, "  "))
