@@ -10,6 +10,10 @@ extends RigidBody3D
 ##   everything -> buoyancy and drag when it is under water
 ## Pushing at the part's position (not the middle) is what makes off-centre
 ## thrust turn you and heavy parts tip you.
+##
+## Fuel: engines burn fuel while you hold the throttle (more throttle = more fuel).
+## When the fuel runs out, wheels and propellers stop pushing. A new vehicle
+## (respawn, mission restart, back to the garage) always starts with a full tank.
 
 const CELL := 1.0 # metres per grid cell
 # Physics layers (named in Project Settings > Layer Names > 3D Physics).
@@ -34,6 +38,10 @@ var thrusters: Array[Dictionary] = []
 var engine_force := 0.0
 var top_speed := 0.0
 var has_seat := false
+var fuel := 0.0 # fuel left
+var fuel_capacity := 0.0 # fuel when full
+var fuel_use := 0.0 # fuel burned per second at full throttle (all engines together)
+var has_tanks := false # false = running on the little reserve under the seat
 
 var _steer_angle := 0.0
 var _spring := 0.0
@@ -97,6 +105,12 @@ func build(blueprint: Dictionary) -> void:
 
 	for p in parts:
 		_add_part(p, com)
+
+	var f := fuel_for(parts.map(func(p): return p.def))
+	fuel_capacity = f.capacity
+	fuel_use = f.use
+	has_tanks = f.tanks > 0
+	fuel = fuel_capacity
 
 	# Self-tuning suspension: soft enough to soak up bumps, stiff enough to carry the weight.
 	if not wheels.is_empty():
@@ -165,7 +179,10 @@ func _physics_process(delta: float) -> void:
 	var forward := -global_basis.z
 	var com_global := to_global(center_of_mass)
 	var speed := linear_velocity.dot(forward)
-	var powered := engine_force > 0.0 and has_seat
+	var powered := engine_force > 0.0 and has_seat and fuel > 0.0
+	if powered:
+		# Burn fuel in proportion to how hard you press the throttle.
+		fuel = maxf(fuel - fuel_use * absf(throttle) * delta, 0.0)
 
 	# Engines give less push as you approach top speed.
 	var taper := 1.0
@@ -293,6 +310,32 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	state.transform = t
 	state.linear_velocity = Vector3.ZERO
 	state.angular_velocity = Vector3.ZERO
+
+
+## Adds up the fuel numbers for a list of part definitions (from parts.json).
+## Shared with the garage, so its "Fuel: N s" stat matches what really happens.
+## Returns {capacity, use, tanks}.
+static func fuel_for(defs: Array) -> Dictionary:
+	var capacity := 0.0
+	var reserve := 0.0
+	var use := 0.0
+	var tanks := 0
+	for def in defs:
+		if def.has("fuel"):
+			capacity += float(def.fuel.get("capacity", 0))
+			tanks += 1
+		if def.has("seat"):
+			reserve = maxf(reserve, float(def.seat.get("reserve_fuel", 0)))
+		if def.has("engine"):
+			use += float(def.engine.get("fuel_use", 0))
+	if tanks == 0:
+		capacity = reserve # no tank: you only get the little reserve can
+	return {"capacity": capacity, "use": use, "tanks": tanks}
+
+
+## How many seconds of full throttle the fuel lasts (INF if the engines burn nothing).
+static func fuel_seconds(capacity: float, use: float) -> float:
+	return INF if use <= 0.0 else capacity / use
 
 
 func speed_kmh() -> float:

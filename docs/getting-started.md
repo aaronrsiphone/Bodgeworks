@@ -98,6 +98,7 @@ Rules the physics enforces:
 - Propellers push from where they are, so one off to the side will turn you.
 - Propellers swivel when you steer, like an outboard motor. That's how you steer in water.
 - Wheels only grip the ground. They can't climb on crates, so push things with your body or forks.
+- Engines burn **fuel** while you hold the throttle. Without a **Fuel Tank**, you only get the little reserve can under the seat (30 seconds of full throttle). Each tank adds 30 more seconds but weighs 40 kg. When you run dry, the wheels and propellers stop pushing. Fuel fills up again when you respawn (Tab), restart a mission (T), or go back to the garage (G). The garage panel shows how many seconds your fuel lasts, and the driving screen shows a fuel gauge if you have tanks.
 
 ## Make a new part (still no code)
 
@@ -106,6 +107,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `mass`: weight in kg.
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.force` and `engine.top_speed`: how much push the engine gives, and up to what speed.
+- `engine.fuel_use`: how much fuel the engine burns per second at full throttle. `fuel.capacity` is how much a fuel tank holds. `seat.reserve_fuel` is the little can you get when there's no tank.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
 - `thrust.force`, `thrust.steer` and `thrust.air`: how hard a propeller pushes, how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth).
 

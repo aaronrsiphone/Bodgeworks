@@ -41,7 +41,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, buggy_tank.json = buggy + fuel tank)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/getting-started.md  player/dev guide: install, controls, garage, missions, editing parts/maps
 docs/implementation-plan.md  roadmap; each item links to a GitHub issue
@@ -64,8 +64,10 @@ docs/.gdignore           keeps Godot from importing docs/
 - JSON numbers load as floats, so wrap them in `int()` for grid cells.
 
 **Part** (`data/parts.json`): `name`, `mass`, `buoyancy` (kg it can hold up under water; more than its mass means it floats) and `color`. Behaviour keys:
-- `seat: {}` — a vehicle needs one to drive.
-- `engine: {force, top_speed}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s).
+- `seat` — a vehicle needs one to drive.
+- `engine: {force, top_speed, fuel_use}` — wheel drive is the summed engine force; push tapers to 0 at `top_speed` (m/s). `fuel_use` is fuel units per second at full throttle.
+- `fuel: {capacity}` — a fuel tank. Tanks' capacities add up.
+- `seat: {reserve_fuel}` — the fuel a vehicle gets when it has **no** tank (largest seat's value; 30 = 30 s for one engine).
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
 - `thrust: {force, steer, air}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
 
@@ -82,6 +84,7 @@ A part with no special look renders as a cube, so new parts need no code unless 
 - **Propellers:** force `thrust × lerp(air, 1, submerged) × throttle × taper`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
 - **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
+- **Fuel:** `fuel` drains by `fuel_use × |throttle| × delta`. At 0 there's no wheel drive or propeller push. `Vehicle.fuel_for(defs)` sums the numbers and the garage uses it too. A new Vehicle starts full, so respawn, restart and garage all refill. (This doesn't scale with power used yet; revisit when #6 lands.)
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
 
 ## Testing
@@ -105,7 +108,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim>` | no |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift\|buggy_tank> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|fuel>` | no |
 | Garage clicks (10 checks) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- out_dir` | yes |
