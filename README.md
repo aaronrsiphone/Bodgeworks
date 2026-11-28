@@ -23,7 +23,7 @@ New here? **[Getting started](docs/getting-started.md)** takes you from nothing 
 - A **garage** where you build vehicles from parts like Lego, then save them and test drive them.
 - A first mission, **Special Delivery**, with gold, silver and bronze times.
 - A test map with a jump ramp, a pond, crates and hills.
-- Wheel suspension, floating, and propellers that steer in water (they push much harder in water than in air).
+- Wheel suspension, floating, and propellers that steer (water propellers push only in water, air propellers mostly in air).
 - New parts can be added by editing JSON.
 
 **Next up:** see what the playtesters (one dad, one son) ask for.

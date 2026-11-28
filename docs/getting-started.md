@@ -96,6 +96,7 @@ Rules the physics enforces:
 - Wheels in front of the middle of the vehicle steer.
 - Heavy parts high up make the vehicle tippy.
 - Engines make **power**, and every wheel on the ground and every propeller shares it. More propellers on one engine won't make you much faster: add another engine instead (but engines are heavy). The garage shows **Power per kg**; higher means faster.
+- There are two propellers. The blue **Water Propeller** only pushes in water. The white **Air Propeller**, with long blades, pushes in the air but only weakly under water.
 - Propellers push from where they are, so one off to the side will turn you.
 - Propellers swivel when you steer, like an outboard motor. That's how you steer in water.
 - Wheels only grip the ground. They can't climb on crates, so push things with your body or forks.
@@ -108,7 +109,7 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `buoyancy`: kg of weight the part can hold up under water. A part floats if this is more than its mass.
 - `engine.power` and `engine.force`: power is how fast it can keep pushing (more power = higher top speed). Force is the most push it gives when you're standing still.
 - `wheel.radius`, `wheel.travel` (suspension) and `wheel.grip`.
-- `thrust.force`, `thrust.steer` and `thrust.air`: the most a propeller can push (it also needs engine power), how many degrees it swivels when you steer, and how much of its push it keeps out of the water (0.2 = a fifth).
+- `thrust.force`, `thrust.steer`, `thrust.air`, `thrust.water` and `thrust.blade`: the most a propeller can push (it also needs engine power), how many degrees it swivels when you steer, how much of its push it keeps out of the water and under water (1 = all, 0 = none), and how long its blades look.
 
 Try a monster-grip wheel, or a float that makes things fly out of the water.
 

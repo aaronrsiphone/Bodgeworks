@@ -41,7 +41,7 @@ missions/delivery_mission.gd  DeliveryMission: needs Start (Marker3D), Cargo (Ri
 missions/special_delivery.tscn  the first mission (route around or across the pond)
 missions/cargo.{gd,tscn} floating cargo crate (own simple buoyancy)
 tests/                   headless/xvfb test scripts (see Testing)
-tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, six_propellers.json = power-budget test)
+tests/blueprints/        test-only vehicles (forklift.json = pusher with forks, six_propellers.json = power-budget test, air_sled/water_sled.json = airprop test)
 tests/screenshot_presets.json  named camera presets for tests/screenshot.gd (see Visual review)
 docs/spec/               game-mechanics.md (design reference + figures), architecture.md (target architecture)
 docs/getting-started.md  player/dev guide: install, controls, garage, missions, editing parts/maps
@@ -68,7 +68,7 @@ docs/.gdignore           keeps Godot from importing docs/
 - `seat: {}` — a vehicle needs one to drive.
 - `engine: {force, power}` — engines are summed into one budget. Total push = `min(force, power / speed)`, so power (W) sets the top speed and force (N) the standstill push.
 - `wheel: {radius, travel, grip}` — raycast suspension, no collider.
-- `thrust: {force, steer, air}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water.
+- `thrust: {force, steer, air, water, blade}` — a propeller: pushes along its facing, swivels `steer`° with steering, and keeps `air` (0–1) of its force out of water and `water` (0–1, default 1) under water. `blade` is the visual blade length. Parts: `propeller` (Water Propeller: air 0, water 1) and `air_propeller` (air 1, water 0.3).
 
 A part with no special look renders as a cube, so new parts need no code unless they need a new behaviour.
 
@@ -76,12 +76,12 @@ A part with no special look renders as a cube, so new parts need no code unless 
 
 - **Compile:** all parts become box colliders (except wheels) on one RigidBody3D. Mass, centre of mass (custom) and diagonal inertia are summed from the parts. The vehicle is shifted so its origin sits under the centre of mass horizontally.
   - No joints yet, so nothing can move relative to anything else.
-- **Power budget:** each tick the total push is shared by the consumers: every grounded wheel (weight 1) and every propeller (weight `lerp(air, 1, submerged)`). Push opposite to motion (reverse to brake) gets the full `force`. Test: `amphibian power` (6 propellers on one engine must be < 1.5× faster than 2).
+- **Power budget:** each tick the total push is shared by the consumers: every grounded wheel (weight 1) and every propeller (weight `lerp(air, water, submerged)`). Push opposite to motion (reverse to brake) gets the full `force`. Test: `amphibian power` (6 propellers on one engine must be < 1.5× faster than 2).
 - **Wheels:** a ray from the mount, masked to `LAYER_WORLD` only, so wheels never climb onto crates.
   - Self-tuning spring and damper.
   - Tyre force (drive + rolling resistance + side grip) is clamped to `load * grip`, and **applied at axle height** to avoid wheelies and flips.
   - Wheels in front of the centre of mass steer. Steering lock shrinks with speed.
-- **Propellers:** their power share, capped at `thrust.force × lerp(air, 1, submerged)`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
+- **Propellers:** their power share, capped at `thrust.force × lerp(air, water, submerged)`, at the propeller's position. Off-centre thrust therefore turns the vehicle. They swivel when steering (direction flips for propellers in front of the centre of mass).
 - **Water:** per part, `submerged_at()` gives buoyancy at the part's position, plus directional drag: strong vertically, strong sideways (keel effect), weak forwards.
 - Vehicle bodies have friction 0.2, so pushed objects slide off them. Air drag is quadratic.
 - **R** flips upright (in `_integrate_forces`). Falling below y = −30 respawns the vehicle.
@@ -107,7 +107,7 @@ Individual tests (run `godot --headless --path . --import` once first; it genera
 
 | Test | Command (from repo root) | Needs a display? |
 |---|---|---|
-| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power>` | no |
+| Driving scenarios | `godot --headless --path . --script res://tests/drive_test.gd -- <buggy\|amphibian\|forklift> <straight\|turn\|pond\|ramp\|push\|pyramid\|swim\|power\|airprop>` | no |
 | Garage clicks (10 checks) | `xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/garage_test.gd [-- out_dir]` | yes (Xvfb) |
 | Mission autopilot | `godot --headless --path . --script res://tests/mission_test.gd -- res://tests/blueprints/forklift.json [out_dir]` (expect gold, about 11.7 s; screenshots need Xvfb) | no |
 | Screenshots | `xvfb-run ... --script res://tests/screenshot.gd -- <scene\|all> <out_dir> [preset...]` (see Visual review) | yes |

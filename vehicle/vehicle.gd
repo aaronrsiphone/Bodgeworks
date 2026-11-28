@@ -158,6 +158,7 @@ func _add_part(p: Dictionary, com: Vector3) -> void:
 		p["thrust"] = float(def.thrust.force)
 		p["swivel"] = deg_to_rad(float(def.thrust.get("steer", 0)))
 		p["air"] = float(def.thrust.get("air", 1.0))
+		p["water"] = float(def.thrust.get("water", 1.0))
 		p["grip"] = 0.0 # how well it can push right now, set every tick
 		thrusters.append(p)
 
@@ -188,14 +189,15 @@ func _physics_process(delta: float) -> void:
 	# Every wheel on the ground and every propeller shares that one budget,
 	# so ten propellers on one engine don't give ten times the push.
 	# A propeller's share ("weight") is how well it can push right now:
-	# 1 under water, only "air" (a fraction) when it's out of the water.
+	# its "water" number under water, its "air" number out of the water.
+	# A water propeller is (air 0, water 1); an air propeller is the other way round.
 	var weight_total := 0.0
 	for w in wheels:
 		w.grounded = _wheel_ray(w).size() > 0
 		if w.grounded:
 			weight_total += 1.0
 	for t in thrusters:
-		t.grip = lerpf(t.air, 1.0, submerged_at(to_global(t.pos)))
+		t.grip = lerpf(t.air, t.water, submerged_at(to_global(t.pos)))
 		weight_total += t.grip
 	var push_per_weight := drive_total / weight_total if weight_total > 0.0 else 0.0
 
@@ -207,7 +209,7 @@ func _physics_process(delta: float) -> void:
 	for t in thrusters:
 		var at := to_global(t.pos)
 		# Its share of the power, but never more than the propeller itself can push
-		# ("force" in parts.json), and only the "air" fraction of that out of water.
+		# ("force" in parts.json), times how well it works where it is (air or water).
 		var cap: float = t.thrust * t.grip
 		var push: float = clampf(push_per_weight * t.grip, -cap, cap)
 		var behind: bool = t.pos.z > center_of_mass.z

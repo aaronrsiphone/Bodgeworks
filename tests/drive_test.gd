@@ -4,11 +4,14 @@ extends SceneTree
 ## Run:  godot --headless --path . --script res://tests/drive_test.gd
 ##   or: godot --headless --path . --script res://tests/drive_test.gd -- amphibian pond
 
-const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power"]
+const SCENARIOS := ["straight", "turn", "pond", "ramp", "push", "pyramid", "swim", "power", "airprop"]
 # "power": swims the 2-propeller Amphibian, then a 6-propeller copy with the same ONE
 # engine, down the pond. The power budget means 6 propellers mustn't be much faster.
 const POWER_BLUEPRINTS := ["res://data/blueprints/amphibian.json", "res://tests/blueprints/six_propellers.json"]
 const POWER_SWAP_FRAME := 300 # each one swims for 5 s
+# "airprop": on dry land, a wheel-less sled with an air propeller must slide along,
+# and the same sled with a water propeller must not move (it only pushes in water).
+const AIRPROP_BLUEPRINTS := ["res://tests/blueprints/air_sled.json", "res://tests/blueprints/water_sled.json"]
 const VEHICLES := ["buggy", "amphibian", "forklift"]
 const FRAMES := 600
 
@@ -27,6 +30,7 @@ var crate_worst_side := 0.0 # ...and how far off to the side
 var failures := 0
 var speed_samples: Array[Vector2] = [] # (time s, forward distance m), for straight's cruise speed
 var power_top_kmh := [0.0, 0.0] # top swim speed of each "power" blueprint
+var sled_moved := [0.0, 0.0] # how far each "airprop" sled got (m)
 
 
 func _initialize() -> void:
@@ -57,7 +61,12 @@ func _physics_process(_delta: float) -> bool:
 		check(false, "the test map spawned a vehicle")
 		return _finish()
 	if scenario == "power" and (frame == 2 or frame == POWER_SWAP_FRAME):
-		v = _power_swap(v, 0 if frame == 2 else 1)
+		v = _swap_vehicle(v, POWER_BLUEPRINTS[0 if frame == 2 else 1], Vector3(40, 0, 8))
+	if scenario == "airprop" and (frame == 2 or frame == POWER_SWAP_FRAME):
+		if frame == POWER_SWAP_FRAME:
+			sled_moved[0] = _flat_distance(v)
+		# Open flat grass east of the start, heading north.
+		v = _swap_vehicle(v, AIRPROP_BLUEPRINTS[0 if frame == 2 else 1], Vector3(80, 1, 60))
 	if frame == 2:
 		print("vehicle: %s  mass %.0f kg  COM %s  inertia %s" % [v.blueprint_name, v.mass, v.center_of_mass, v.inertia])
 		if scenario == "pond":
@@ -107,6 +116,8 @@ func _physics_process(_delta: float) -> bool:
 			Input.action_press("accelerate")
 			var which := 0 if frame < POWER_SWAP_FRAME else 1
 			power_top_kmh[which] = maxf(power_top_kmh[which], v.speed_kmh())
+		"airprop":
+			if frame > 30: Input.action_press("accelerate")
 	if scenario == "straight" and frame % 30 == 0:
 		speed_samples.append(Vector2(frame / 60.0, -(v.global_position.z - start_pos.z)))
 	min_upright = minf(min_upright, v.global_basis.y.y)
@@ -136,12 +147,12 @@ func _physics_process(_delta: float) -> bool:
 	return false
 
 
-## "power" scenario: replace the map's vehicle with blueprint `which`, at the south end
-## of the pond facing north, and make it the one the controls drive.
-func _power_swap(old: Vehicle, which: int) -> Vehicle:
+## "power" and "airprop": replace the map's vehicle with another blueprint at `at`,
+## facing north, and make it the one the controls drive.
+func _swap_vehicle(old: Vehicle, path: String, at: Vector3) -> Vehicle:
 	var v := Vehicle.new()
-	v.build(PartCatalog.load_blueprint(POWER_BLUEPRINTS[which]))
-	v.transform = Transform3D(Basis.IDENTITY, Vector3(40, 0, 8))
+	v.build(PartCatalog.load_blueprint(path))
+	v.transform = Transform3D(Basis.IDENTITY, at)
 	old.queue_free()
 	main.add_child(v)
 	main.vehicle = v
@@ -149,6 +160,10 @@ func _power_swap(old: Vehicle, which: int) -> Vehicle:
 	start_pos = v.global_position
 	last_heading = _heading(v)
 	return v
+
+
+func _flat_distance(v: Vehicle) -> float:
+	return Vector2(v.global_position.x - start_pos.x, v.global_position.z - start_pos.z).length()
 
 
 ## 0 = north, +90 = west (turned left).
@@ -177,6 +192,11 @@ func _check_expectations(v: Vehicle) -> void:
 			print("top swim speed: 2 propellers %.1f km/h, 6 propellers %.1f km/h (x%.2f)" % [power_top_kmh[0], power_top_kmh[1], ratio])
 			check(power_top_kmh[0] > 22.0 and power_top_kmh[0] < 32.0, "Amphibian swims at 22-32 km/h (%.1f km/h)" % power_top_kmh[0])
 			check(ratio < 1.5, "6 propellers on one engine are less than 1.5x faster than 2 (x%.2f)" % ratio)
+		"airprop":
+			sled_moved[1] = moved
+			print("on land: air propeller sled moved %.1f m, water propeller sled %.1f m" % [sled_moved[0], sled_moved[1]])
+			check(sled_moved[0] >= 5.0, "air propeller pushes on land (%.1f m >= 5 m)" % sled_moved[0])
+			check(sled_moved[1] < 1.0, "water propeller does nothing on land (%.1f m < 1 m)" % sled_moved[1])
 		"turn":
 			check(turned > 90.0, "turned left more than 90 deg (%.0f deg)" % turned)
 		"ramp":
