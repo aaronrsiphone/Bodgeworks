@@ -7,6 +7,7 @@ extends Node3D
 ##   1-9          pick a part          R       rotate the part
 ##   Ctrl+Z       undo                 G       test drive
 ##   M            mirror mode: every part you add or remove gets a twin on the other side
+##   B            wire mode: click a part (like a spring) to give it button 1, 2, 3 or none
 
 const BUDGET := 60 # most parts a vehicle can have
 const LIMIT := 12 # how far from the middle you can build (in cells)
@@ -15,11 +16,16 @@ const FLOOR_Y := -0.5 # the floor is the bottom of the y = 0 cells
 @onready var camera: GarageCamera = $Camera
 @onready var build_root: Node3D = $Build
 
-## Vector3i cell -> {"part": id, "rot": 0-3, "node": StaticBody3D}
+## Badge colours for buttons 1, 2, 3 (they match the gamepad's A, X and B).
+const BUTTON_COLORS := [Color("#9a9a9a"), Color("#5fd35f"), Color("#4fa3ff"), Color("#ff5a4f")]
+
+## Vector3i cell -> {"part": id, "rot": 0-5, "button": 0-3, "node": StaticBody3D}
 var parts := {}
 var part_ids: Array[String] = []
 var selected := ""
 var rot := 0
+## Wire mode: clicks set a part's accessory button instead of adding parts.
+var wiring := false
 
 ## Mirror mode. The mirror line sits at x = mirror_x2 / 2. We store it doubled so it is
 ## always a whole number: even = through the middle of a cell, odd = on the edge between two.
@@ -37,6 +43,8 @@ var _ghost_reason := ""
 var _right_down := false
 
 var _info: RichTextLabel
+var _help: Label
+var _wire_button: Button
 var _name_edit: LineEdit
 var _load_menu: OptionButton
 var _part_buttons := {}
@@ -66,14 +74,14 @@ func _ready() -> void:
 
 # --- building --------------------------------------------------------------
 
-func place(cell: Vector3i, id: String, r := 0) -> void:
+func place(cell: Vector3i, id: String, r := 0, button := 0) -> void:
 	var def := PartCatalog.get_part(id)
-	if def.has("wheel"):
-		r = 0 # wheels always face forward
+	if r < 0 or r >= PartCatalog.rot_count(def):
+		r = 0 # e.g. wheels always face forward, blocks can't point down
 	# The whole body turns with the part, so its boxes and its look turn together.
 	var body := StaticBody3D.new()
 	body.position = Vector3(cell)
-	body.basis = Basis(Vector3.UP, r * PI / 2.0)
+	body.basis = PartCatalog.rot_basis(r)
 	body.set_meta("cell", cell)
 	# The mouse ray hits the part's real boxes, so you point at what you can see
 	# (a plate is thin, so the space above it is empty). Placing still snaps to cells.
@@ -87,7 +95,64 @@ func place(cell: Vector3i, id: String, r := 0) -> void:
 	var visual := PartVisuals.create(id, def)
 	body.add_child(visual)
 	build_root.add_child(body)
-	parts[cell] = {"part": id, "rot": r, "node": body}
+	parts[cell] = {"part": id, "rot": r, "button": 0, "node": body}
+	set_button(cell, button)
+
+
+## Wire a part to accessory button 1-3, or 0 to unwire it. Only parts that do
+## something when pressed (see PartCatalog.BUTTON_BEHAVIOURS) can be wired.
+func set_button(cell: Vector3i, button: int) -> void:
+	if not parts.has(cell):
+		return
+	var part: Dictionary = parts[cell]
+	if not PartCatalog.uses_button(PartCatalog.get_part(part.part)):
+		button = 0
+	part.button = clampi(button, 0, PartCatalog.BUTTON_COUNT)
+	_update_badge(cell)
+
+
+## The little number floating over a wired part. In wire mode, parts that
+## could be wired but aren't get a grey "–" so you can see what to click.
+func _update_badge(cell: Vector3i) -> void:
+	var part: Dictionary = parts[cell]
+	var badge: Label3D = part.node.get_node_or_null("Badge")
+	var can_wire := PartCatalog.uses_button(PartCatalog.get_part(part.part))
+	var wanted: bool = part.button > 0 or (wiring and can_wire)
+	if not wanted:
+		if badge:
+			badge.queue_free()
+		return
+	if badge == null:
+		badge = Label3D.new()
+		badge.name = "Badge"
+		badge.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		badge.no_depth_test = true # visible even behind other parts
+		badge.fixed_size = true # same size on screen however far the camera is
+		badge.pixel_size = 0.0012
+		badge.font_size = 48
+		badge.outline_size = 16
+		badge.outline_modulate = Color.BLACK
+		badge.position = Vector3(0, 0.7, 0)
+		part.node.add_child(badge)
+	badge.text = str(part.button) if part.button > 0 else "–"
+	badge.modulate = BUTTON_COLORS[part.button]
+
+
+func set_wiring(on: bool) -> void:
+	wiring = on
+	if _wire_button:
+		_wire_button.set_pressed_no_signal(on)
+	for cell in parts:
+		_update_badge(cell)
+	_help.text = _help_text()
+	_help.add_theme_color_override("font_color", Color("#ffd070") if on else Color.WHITE)
+	_update_ghost()
+
+
+func _help_text() -> String:
+	if wiring:
+		return "WIRE MODE:  left click a spring to pick its button (1, 2, 3, off)     Right click: unwire     B: done"
+	return "Left click: add part     Right click: remove     Right drag: turn camera     Scroll: zoom     R: rotate     M: mirror     B: wire buttons     Ctrl+Z: undo"
 
 
 func remove(cell: Vector3i) -> void:
@@ -209,7 +274,10 @@ func _build_mirror_line() -> void:
 func to_blueprint() -> Dictionary:
 	var list := []
 	for cell in parts:
-		list.append({"part": parts[cell].part, "pos": [cell.x, cell.y, cell.z], "rot": parts[cell].rot})
+		var entry := {"part": parts[cell].part, "pos": [cell.x, cell.y, cell.z], "rot": parts[cell].rot}
+		if parts[cell].button > 0:
+			entry["button"] = parts[cell].button # only saved when wired
+		list.append(entry)
 	var vehicle_name := _name_edit.text.strip_edges()
 	return {"name": vehicle_name if vehicle_name != "" else "My Vehicle", "parts": list}
 
@@ -218,7 +286,7 @@ func _load_blueprint(bp: Dictionary) -> void:
 	clear()
 	for entry in bp.get("parts", []):
 		var p: Array = entry.get("pos", [0, 0, 0])
-		place(Vector3i(int(p[0]), int(p[1]), int(p[2])), entry.get("part", "block"), int(entry.get("rot", 0)))
+		place(Vector3i(int(p[0]), int(p[1]), int(p[2])), entry.get("part", "block"), int(entry.get("rot", 0)), int(entry.get("button", 0)))
 	_name_edit.text = bp.get("name", "My Vehicle")
 	_changed()
 
@@ -254,7 +322,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			_try_place()
+			if wiring:
+				_try_wire(1)
+			else:
+				_try_place()
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			if event.pressed:
 				_right_down = true
@@ -262,17 +333,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif _right_down:
 				_right_down = false
 				if not camera.dragging: # a click, not a camera drag
-					_try_remove()
+					if wiring:
+						_try_wire(0)
+					else:
+						_try_remove()
 	elif event is InputEventMouseMotion:
 		_update_ghost()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_Z and event.ctrl_pressed:
 			undo()
 		elif event.keycode == KEY_R:
-			rot = (rot + 1) % 4
+			rot = (rot + 1) % PartCatalog.rot_count(PartCatalog.get_part(selected))
 			_update_ghost()
 		elif event.keycode == KEY_M:
 			set_mirror(not mirror_on)
+		elif event.keycode == KEY_B:
+			set_wiring(not wiring)
 		elif event.keycode >= KEY_1 and event.keycode <= KEY_9:
 			var i: int = event.keycode - KEY_1
 			if i < part_ids.size():
@@ -301,8 +377,29 @@ func build_at(cell: Vector3i) -> bool:
 	place(cell, selected, rot)
 	if mirror_on and mirror_cell(cell) != cell:
 		place(mirror_cell(cell), selected, mirror_rot(rot))
+	if PartCatalog.uses_button(PartCatalog.get_part(selected)):
+		_say("Press B to wire it to a button")
 	_changed()
 	return true
+
+
+## Wire mode click. step 1 = next button (off -> 1 -> 2 -> 3 -> off), 0 = unwire.
+func _try_wire(step: int) -> void:
+	var hit := _pick()
+	if not hit.has("part_cell"):
+		return
+	var cell: Vector3i = hit.part_cell
+	var part: Dictionary = parts[cell]
+	var def := PartCatalog.get_part(part.part)
+	if not PartCatalog.uses_button(def):
+		_say("A %s doesn't do anything when you press a button" % def.get("name", part.part))
+		return
+	var button: int = 0 if step == 0 else (part.button + 1) % (PartCatalog.BUTTON_COUNT + 1)
+	if button == part.button:
+		return
+	_snapshot()
+	set_button(cell, button)
+	_say("%s: %s" % [def.get("name", part.part), "button %d" % button if button > 0 else "not wired"])
 
 
 func _try_remove() -> void:
@@ -354,7 +451,7 @@ func _update_ghost() -> void:
 	if _ghost == null:
 		return
 	var over_ui := get_viewport().gui_get_hovered_control() != null
-	var hit := {} if over_ui else _pick()
+	var hit := {} if over_ui or wiring else _pick()
 	if not hit.has("place_cell"):
 		_ghost.visible = false
 		_mirror_ghost.visible = false
@@ -362,14 +459,14 @@ func _update_ghost() -> void:
 	_ghost.visible = true
 	_ghost_cell = hit.place_cell
 	_ghost.position = Vector3(_ghost_cell)
-	var r := 0 if PartCatalog.get_part(selected).has("wheel") else rot
-	_ghost.basis = Basis(Vector3.UP, r * PI / 2.0)
+	var r := rot if rot < PartCatalog.rot_count(PartCatalog.get_part(selected)) else 0
+	_ghost.basis = PartCatalog.rot_basis(r)
 	_ghost_reason = why_not_pair(_ghost_cell)
 	_ghost_ok = _ghost_reason == ""
 	var twin := mirror_cell(_ghost_cell)
 	_mirror_ghost.visible = mirror_on and twin != _ghost_cell
 	_mirror_ghost.position = Vector3(twin)
-	_mirror_ghost.basis = Basis(Vector3.UP, mirror_rot(r) * PI / 2.0)
+	_mirror_ghost.basis = PartCatalog.rot_basis(mirror_rot(r))
 	for g in [_ghost, _mirror_ghost]:
 		for mi in g.find_children("*", "MeshInstance3D", true, false):
 			mi.material_override = mi.get_meta("ghost_material") if _ghost_ok else _bad_material
@@ -377,6 +474,8 @@ func _update_ghost() -> void:
 
 func _select(id: String) -> void:
 	selected = id
+	if wiring:
+		set_wiring(false) # picking a part means you want to build again
 	if _ghost:
 		_ghost.queue_free()
 		_mirror_ghost.queue_free()
@@ -447,6 +546,8 @@ func _update_info() -> void:
 		for behaviour in ["seat", "engine", "wheel", "thrust"]:
 			if def.has(behaviour):
 				count[behaviour] = count.get(behaviour, 0) + 1
+		if PartCatalog.uses_button(def) and parts[cell].button == 0:
+			count["unwired"] = count.get("unwired", 0) + 1
 
 	var t := "[font_size=24][b]%s[/b][/font_size]\n" % _name_edit.text
 	t += "Parts: %d / %d     Weight: %d kg\n" % [parts.size(), BUDGET, roundi(mass)]
@@ -468,6 +569,8 @@ func _update_info() -> void:
 			t += "Fuel: %d s at full throttle%s\n" % [roundi(secs), "" if f.tanks > 0 else " (seat reserve; add a Fuel Tank for more)"]
 		if not count.has("wheel") and not count.has("thrust"):
 			t += "[color=#ff8080]No wheels or propellers: it can't move![/color]\n"
+		if count.has("unwired"):
+			t += "[color=#ffd070]%d part(s) not wired to a button: press B[/color]\n" % count.unwired
 	_info.text = t
 
 
@@ -523,6 +626,8 @@ func _build_ui() -> void:
 	_load_menu.item_selected.connect(_on_load_selected)
 	top.add_child(_load_menu)
 	_refresh_load_menu()
+	_wire_button = _button(top, "Wire (B)", func(): set_wiring(not wiring))
+	_wire_button.toggle_mode = true
 	_button(top, "Undo", undo)
 	_mirror_button = _button(top, "Mirror (M)", func(): set_mirror(not mirror_on))
 	_mirror_button.toggle_mode = true
@@ -577,7 +682,8 @@ func _build_ui() -> void:
 		_part_buttons[id] = b
 
 	var help := Label.new()
-	help.text = "Left click: add part     Right click: remove     Right drag: turn camera     Scroll: zoom     R: rotate     M: mirror     Ctrl+Z: undo"
+	_help = help
+	help.text = _help_text()
 	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	help.anchor_top = 1.0
 	help.anchor_bottom = 1.0

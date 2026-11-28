@@ -52,21 +52,54 @@ func _process(_delta: float) -> bool:
 		_key(KEY_Z, true) # undo both plates so the counts below stay the same
 	if frame == 42:
 		check(not garage.parts.has(Vector3i(0, 3, 1)), "ctrl+z removed the plates again")
+		# Wiring: a spring on top of the propeller, wired to button 1.
+	if frame == 46:
+		_select_part("spring")
+		_click_cell_top(Vector3(1, 2, 2), MOUSE_BUTTON_LEFT) # on top of the propeller
+	if frame == 50:
+		check(garage.parts.get(Vector3i(1, 3, 2), {}).get("part") == "spring", "picked the spring and placed it")
+		_key(KEY_B) # wire mode
+		_click_cell_top(Vector3(1, 3, 2), MOUSE_BUTTON_LEFT) # spring: unwired -> button 1
+	if frame == 55:
+		check(garage.wiring, "B turned on wire mode")
+		var spring: Dictionary = garage.parts.get(Vector3i(1, 3, 2), {})
+		check(spring.get("button") == 1, "clicking the spring in wire mode wired it to button 1")
+		check(spring.node.get_node_or_null("Badge") != null, "the spring shows a button badge")
+		_click_cell_top(Vector3(0, 2, 1), MOUSE_BUTTON_LEFT) # a block can't be wired
+	if frame == 60:
+		check(garage.parts[Vector3i(0, 2, 1)].button == 0, "blocks can't be wired to a button")
+		check(garage.parts.size() == 15, "clicks in wire mode didn't add parts (15), got %d" % garage.parts.size())
+		_shot("garage_03_wiring.png")
+		# Save and load it back: the wiring must survive. Use a test-only name so
+		# we never overwrite one of the player's own vehicles.
+		var bp: Dictionary = garage.to_blueprint()
+		bp.name = "zz garage test wiring"
+		var path := PartCatalog.save_blueprint(bp)
+		garage.clear()
+		garage._load_blueprint(PartCatalog.load_blueprint(path))
+		DirAccess.remove_absolute(path)
+		check(garage.parts.get(Vector3i(1, 3, 2), {}).get("button") == 1, "the spring's button survived save and load")
+		garage._name_edit.text = "My Vehicle"
+		_key(KEY_B) # wire mode off again
+	if frame == 65:
+		check(not garage.wiring, "B turned wire mode off")
 		_key(KEY_G)
-	if frame == 100:
+	if frame == 125:
 		var main := current_scene
 		check(main.name == "TestMap", "G switched to the test map")
-		check(main.vehicle.parts.size() == 14, "test map drives the garage build (14 parts), got %d" % main.vehicle.parts.size())
-		_shot("garage_03_test_drive.png")
+		check(main.vehicle.parts.size() == 15, "test map drives the garage build (15 parts), got %d" % main.vehicle.parts.size())
+		check(main.vehicle.buttons.has(1), "the vehicle has a part on button 1")
+		_shot("garage_04_test_drive.png")
 		_key(KEY_G)
-	if frame == 130:
-		check(current_scene.name == "Garage" and current_scene.parts.size() == 14, "G went back to the garage with the build kept")
+	if frame == 155:
+		check(current_scene.name == "Garage" and current_scene.parts.size() == 15, "G went back to the garage with the build kept")
+		check(current_scene.parts.get(Vector3i(1, 3, 2), {}).get("button") == 1, "...including the wiring")
 		# Mirror mode. The build spans x = -1 .. 2, so the mirror line is at x = 0.5
 		# (stored doubled as mirror_x2 = 1) and cell x mirrors to 1 - x.
 		garage = current_scene
 		_key(KEY_M)
 		_select_key(KEY_1) # block
-	if frame == 135:
+	if frame == 160:
 		check(garage.mirror_on and garage.mirror_x2 == 1, "M turned mirror on with the line at x = 0.5 (x2 = %d)" % garage.mirror_x2)
 		check(garage.mirror_rot(1) == 3 and garage.mirror_rot(3) == 1 and garage.mirror_rot(0) == 0 and garage.mirror_rot(2) == 2, "mirrored rotation swaps left and right")
 		check(garage.mirror_rot(4) == 4 and garage.mirror_rot(5) == 5, "rotations without a left or right (4, 5) stay the same")
@@ -74,19 +107,19 @@ func _process(_delta: float) -> bool:
 		garage.build_at(Vector3i(-1, 0, 1))
 		check(garage.parts.has(Vector3i(-1, 0, 1)) and garage.parts.has(Vector3i(2, 0, 1)), "mirror placed a twin at (2,0,1)")
 		garage.build_at(Vector3i(-2, 0, 1))
-	if frame == 140:
+	if frame == 165:
 		check(garage.parts.has(Vector3i(-2, 0, 1)) and garage.parts.has(Vector3i(3, 0, 1)), "placing at (-2,0,1) also filled the mirrored cell (3,0,1)")
-		check(garage.parts.size() == 18, "four parts added as two pairs (18), got %d" % garage.parts.size())
+		check(garage.parts.size() == 19, "four parts added as two pairs (19), got %d" % garage.parts.size())
 		_shot("garage_04_mirror.png")
 		_key(KEY_Z, true)
-	if frame == 145:
+	if frame == 170:
 		check(not garage.parts.has(Vector3i(-2, 0, 1)) and not garage.parts.has(Vector3i(3, 0, 1)), "one ctrl+z removed both mirrored parts")
 		check(garage.parts.has(Vector3i(-1, 0, 1)) and garage.parts.has(Vector3i(2, 0, 1)), "...and kept the earlier pair")
 		check(garage.why_not_pair(Vector3i(-2, 0, 3)) != "", "a pair is refused when it doesn't touch the vehicle")
 		garage.remove_at(Vector3i(2, 0, 1))
 		check(not garage.parts.has(Vector3i(-1, 0, 1)) and not garage.parts.has(Vector3i(2, 0, 1)), "removing a part also removed its twin")
 		_key(KEY_M)
-	if frame == 150:
+	if frame == 175:
 		check(not garage.mirror_on, "M turned mirror off again")
 		garage.build_at(Vector3i(-1, 0, 1))
 		check(garage.parts.has(Vector3i(-1, 0, 1)) and not garage.parts.has(Vector3i(2, 0, 1)), "with mirror off only one part is placed")

@@ -16,6 +16,7 @@ var vehicle: Vehicle
 var mission: Node # set when playing a mission (see missions/)
 var _entries: Array[Dictionary] = []
 var _index := 0
+var _accessory_was_down := [false, false, false, false] # [unused, 1, 2, 3]
 
 
 func _ready() -> void:
@@ -24,7 +25,7 @@ func _ready() -> void:
 	keys_label = hud.duplicate()
 	keys_label.anchor_top = 1.0
 	keys_label.anchor_bottom = 1.0
-	keys_label.offset_top = -70
+	keys_label.offset_top = -92 # room for three lines: accessories, driving, other keys
 	keys_label.offset_bottom = -12
 	keys_label.add_theme_font_size_override("font_size", 15)
 	keys_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -68,6 +69,12 @@ func _physics_process(_delta: float) -> void:
 	vehicle.throttle = Input.get_axis("reverse", "accelerate")
 	vehicle.steer = Input.get_axis("steer_right", "steer_left")
 	vehicle.brake = Input.is_action_pressed("brake")
+	# Accessory buttons fire once per press (holding the key doesn't repeat).
+	for n in range(1, 4):
+		var down := Input.is_action_pressed("accessory_%d" % n)
+		if down and not _accessory_was_down[n]:
+			vehicle.press_button(n)
+		_accessory_was_down[n] = down
 	if vehicle.global_position.y < -30.0: # fell off the world somehow
 		spawn_vehicle(_index)
 
@@ -93,4 +100,8 @@ func _process(_delta: float) -> void:
 		var full := vehicle.fuel / vehicle.fuel_capacity
 		var bars := ceili(full * 10.0)
 		hud.text += "   Fuel [%s%s] %d%%" % ["|".repeat(bars), ".".repeat(10 - bars), roundi(full * 100.0)]
-	keys_label.text = "W/S  drive / reverse     A/D  steer     Space  brake\n" + keys
+	var t := ""
+	var accessories := vehicle.button_summary() # e.g. ["1  Spring x2"]
+	if not accessories.is_empty():
+		t += "     ".join(accessories) + "\n"
+	keys_label.text = t + "W/S  drive / reverse     A/D  steer     Space  brake\n" + keys

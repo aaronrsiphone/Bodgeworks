@@ -50,6 +50,22 @@ static func create(id: String, def: Dictionary) -> Node3D:
 			# A thin board with a rounder front edge. (It still collides like a full cube.)
 			root.add_child(box(Vector3(0.98, 0.08, 0.98), Vector3(0, -0.2, 0), color))
 			root.add_child(cylinder(0.06, 0.98, color, Vector3(0, 0, PI / 2), Vector3(0, -0.2, -0.46)))
+		"spring":
+			# A base plate at the back, a coil, and a foot that kicks out forwards
+			# (the part's facing). The vehicle moves "Foot" and stretches "Coil" when it fires.
+			root.add_child(box(Vector3(0.95, 0.95, 0.2), Vector3(0, 0, 0.38), Color("#5a6270")))
+			var coil := Node3D.new()
+			coil.name = "Coil"
+			coil.position = Vector3(0, 0, 0.28) # the coil grows forwards from the base
+			var rings := 4
+			for i in rings:
+				var ring := cylinder(0.3, 0.08, color, Vector3(PI / 2, 0, 0), Vector3(0, 0, -(i + 0.5) * 0.55 / rings))
+				coil.add_child(ring)
+			coil.add_child(cylinder(0.08, 0.55, Color("#9a9a9a"), Vector3(PI / 2, 0, 0), Vector3(0, 0, -0.275)))
+			root.add_child(coil)
+			var foot := box(Vector3(0.8, 0.8, 0.12), Vector3(0, 0, -0.38), Color("#e8a33d"))
+			foot.name = "Foot"
+			root.add_child(foot)
 		"engine":
 			root.add_child(box(Vector3(0.9, 0.7, 0.9), Vector3(0, -0.15, 0), color))
 			root.add_child(cylinder(0.08, 0.5, Color("#333333"), Vector3.ZERO, Vector3(0.25, 0.35, 0.3)))

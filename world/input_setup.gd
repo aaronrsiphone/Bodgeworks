@@ -8,11 +8,16 @@ static func ensure_actions() -> void:
 	_action("reverse", [_key(KEY_S), _key(KEY_DOWN), _axis(JOY_AXIS_TRIGGER_LEFT, 1.0)])
 	_action("steer_left", [_key(KEY_A), _key(KEY_LEFT), _axis(JOY_AXIS_LEFT_X, -1.0)])
 	_action("steer_right", [_key(KEY_D), _key(KEY_RIGHT), _axis(JOY_AXIS_LEFT_X, 1.0)])
-	_action("brake", [_key(KEY_SPACE), _button(JOY_BUTTON_B)])
+	# Brake and restart moved off B and X so the face buttons are free for accessories.
+	_action("brake", [_key(KEY_SPACE), _button(JOY_BUTTON_LEFT_SHOULDER)])
 	_action("reset_vehicle", [_key(KEY_R), _button(JOY_BUTTON_Y)])
 	_action("next_vehicle", [_key(KEY_TAB), _button(JOY_BUTTON_BACK)])
 	_action("garage", [_key(KEY_G), _button(JOY_BUTTON_START)])
-	_action("restart_mission", [_key(KEY_T), _button(JOY_BUTTON_X)])
+	_action("restart_mission", [_key(KEY_T), _button(JOY_BUTTON_DPAD_DOWN)])
+	# Accessory buttons: fire every part wired to that button in the garage.
+	_action("accessory_1", [_key(KEY_1), _button(JOY_BUTTON_A)])
+	_action("accessory_2", [_key(KEY_2), _button(JOY_BUTTON_X)])
+	_action("accessory_3", [_key(KEY_3), _button(JOY_BUTTON_B)])
 
 
 static func _action(action: StringName, events: Array) -> void:

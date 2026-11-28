@@ -28,10 +28,11 @@ The game starts in the **garage**, with the Buggy ready to change.
 
 | Do this | How |
 |---|---|
-| Pick a part | Click it in the bottom bar, or press 1–9 |
+| Pick a part | Click it in the bottom bar, or press 1–9 for the first nine |
 | Add a part | Left-click. The see-through ghost shows where it goes and snaps onto the face of the part you point at. Red means it can't go there. |
 | Remove a part | Right-click it |
-| Rotate the part | R (useful for propellers, which push away from their blades, and for walls and trays) |
+| Rotate the part | R (useful for propellers, which push away from their blades, and for walls and trays). Springs can also point down and up: keep pressing R. |
+| Wire a part to a button | Press **B** (or the **Wire** button) for wire mode. Left-click a spring to give it button 1, then 2, then 3, then off. Right-click unwires it. Press B again when you're done. |
 | Turn the camera | Right-drag, or Q/E and the arrow keys |
 | Zoom / slide | Scroll wheel / middle-drag |
 | Mirror mode | M, or the **Mirror** button. A blue line appears down the middle of your vehicle, and every part you add or remove gets a twin on the other side (a second ghost shows where). Ctrl+Z undoes both at once. |
@@ -49,6 +50,14 @@ Not every part fills a whole cell:
 - **Tray**: a plate with a low rim on two sides. Turn four of them with R so the rims point outwards, and they make a 2 × 2 box that's just right for a crate.
 
 Things slide easily on your vehicle, so a crate on a flat plate slides off the first time you turn. The tray's rim is what keeps it in.
+
+**Accessory buttons:** some parts do something when you press a button while driving. Wired parts show a coloured number above them (1 green, 2 blue, 3 red, like the gamepad's A, X and B). Several parts can share a button, so two springs on button 1 fire together. Right now the **Spring** is the only button part:
+- It kicks out its orange foot in the direction it faces.
+- Point it **down** (R until it faces the floor) and it kicks the ground, so the vehicle jumps.
+- Point it forwards and it kicks crates away.
+- After a kick it needs a second to reload.
+
+Load the **Hopper** starter to try one: 1 jumps, 2 kicks.
 
 **Save** keeps your vehicle (type a name first). **Load...** brings back a saved vehicle or a starter. Saved vehicles also show up when you press Tab in the test map.
 
@@ -74,11 +83,12 @@ To make your own delivery mission, duplicate `missions/special_delivery.tscn`, t
 |---|---|---|
 | Drive / reverse | W / S (or arrow keys) | Right trigger / left trigger |
 | Steer | A / D | Left stick |
-| Brake | Space | B |
+| Brake | Space | Left bumper |
 | Flip upright | R | Y |
 | Next vehicle | Tab | Back / View |
 | Back to the garage | G | Start / Menu |
-| Restart mission | T | X |
+| Restart mission | T | D-pad down |
+| Accessory buttons | 1 / 2 / 3 | A / X / B |
 
 ## Things to try
 
@@ -87,6 +97,7 @@ To make your own delivery mission, duplicate `missions/special_delivery.tscn`, t
 - Press **Tab** for the **Amphibian**. Its floats and propellers get it across the pond and up the ramp on the far side.
 - Press **Tab** again for the **Plane**. Point it down a long, clear stretch (the east side of the map is best) and hold **W**. It takes off by itself at about 55 km/h and keeps climbing. Steer gently!
 - Put **Flat Wings** on the sides of the Buggy, and a couple at the back as a tail, then hit the jump ramp. You glide much further.
+- Press **Tab** again for the **Hopper**. Press 1 to jump, and 2 to kick a crate.
 
 ## Make a vehicle by hand (the JSON way)
 
@@ -101,6 +112,8 @@ To make one:
 
 1. Copy `buggy.json` to `my_car.json` and change the `"name"`.
 2. Add, move or remove parts. The part types are listed in `data/parts.json`.
+   - `"rot"` turns a part: 0 to 3 turn it round in quarter turns, 4 points it down, and 5 points it up (only parts with `can_face_up_down`, like the spring).
+   - `"button": 1` wires a part to accessory button 1 (or 2 or 3).
 3. Everything in `data/blueprints/` appears in the garage's **Load...** menu and in the test map's Tab list.
 
 Rules the physics enforces:
@@ -132,6 +145,8 @@ Open `data/parts.json` and copy an entry. The numbers you can change:
 - `thrust.force`, `thrust.steer`, `thrust.air`, `thrust.water` and `thrust.blade`: the most a propeller can push (it also needs engine power), how many degrees it swivels when you steer, how much of its push it keeps out of the water and under water (1 = all, 0 = none), and how long its blades look.
 - `shape`: makes a part thinner than a whole cell. It's a list of boxes, each with a `size` `[x, y, z]` in metres and an `offset` from the middle of the cell. For example, `{"size": [1, 0.2, 1], "offset": [0, -0.4, 0]}` is a plate lying on the bottom of the cell. The boxes are what you see, what things bump into, and where the part's weight is. Look at the Plate, Wall and Tray to see how it works.
 - `wing.area`, `wing.lift`, `wing.stall` and `wing.camber`: how big the wing is in square metres, how strongly it lifts, the angle in degrees where it stalls, and how much it lifts when perfectly level.
+- `spring.impulse`, `spring.kick_speed`, `spring.reach` and `spring.cooldown`: how hard a spring kicks, the fastest it can fling a crate, how far its foot stretches, and how long it takes to reload.
+- `can_face_up_down: true` lets R point the part down and up in the garage.
 
 Try a monster-grip wheel, or a float that makes things fly out of the water.
 
@@ -177,7 +192,7 @@ godot --headless --path . --script res://tests/drive_test.gd -- buggy straight
 godot --headless --path . --script res://tests/drive_test.gd -- amphibian ramp
 ```
 
-The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates) `swim` (steer in the pond), `jump` (off the jump ramp; with a winged vehicle, the plain buggy jumps first to compare) and `fly` (full throttle down the long east side). Use `forklift`, `winged_buggy` or `plane` instead of `buggy` to try another vehicle, or give a blueprint's path, like `res://data/blueprints/plane.json`. The checks are at the bottom of `tests/drive_test.gd`, in `_check_expectations()`.
+The scenarios are `straight`, `turn`, `pond`, `ramp`, `push` (weave while pushing a crate), `pyramid` (plough through the crates), `swim` (steer in the pond), `power` (6 propellers on one engine mustn't be much faster than 2), `airprop` (air vs water propeller on land), `fuel` (run dry, or keep going with a tank), `jump` (off the jump ramp; with a winged vehicle, the plain buggy jumps first to compare), `fly` (full throttle down the long east side), `hop` (press 1 and the spring must lift it over 0.5 m) and `kick` (press 2 and the spring must kick a crate over 3 m). Use `forklift`, `buggy_tank`, `winged_buggy`, `plane` or `hopper` instead of `buggy` to try another vehicle, or give a blueprint's path, like `res://data/blueprints/plane.json`. The checks are at the bottom of `tests/drive_test.gd`, in `_check_expectations()`.
 
 An autopilot can play the delivery mission and report the time. It fails if it doesn't finish, or is slower than silver:
 
