@@ -32,6 +32,8 @@ New here? **[Getting started](docs/getting-started.md)** takes you from nothing 
 |---|---|
 | [Getting started](docs/getting-started.md) | Install Godot, open the project, controls, and how to make your own vehicles and parts. |
 | [Game mechanics reference](docs/spec/game-mechanics.md) | Analysis of the vehicle-construction genre: building, physics, challenges, progression, and the design pillars we're borrowing from. |
+| [Implementation plan](docs/implementation-plan.md) | The roadmap from here: phases, linked GitHub issues, and which ones need a vision-capable agent. |
+| [CLAUDE.md](CLAUDE.md) | Guide for AI agents: project map, physics model, data formats, how to run the tests. |
 | [Architecture](docs/spec/architecture.md) | Proposed Godot 4 + Rust (gdext) + Jolt architecture, data flows, and the first vertical-slice milestone. |
 
 ## Design pillars (short version)
