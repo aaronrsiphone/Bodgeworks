@@ -218,6 +218,8 @@ func _swap_vehicle(old: Vehicle, path: String, at: Vector3) -> Vehicle:
 
 func _flat_distance(v: Vehicle) -> float:
 	return Vector2(v.global_position.x - start_pos.x, v.global_position.z - start_pos.z).length()
+
+
 ## Jump scenario: watches for the wheels leaving the jump ramp and landing again.
 ## Returns true when every jump is done (and checks have run).
 func _track_jump(v: Vehicle) -> bool:
