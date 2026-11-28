@@ -56,6 +56,7 @@ var hop_start_y := 0.0 # hop: height just before the spring fires
 var hop_peak := 0.0 # ...and how much higher it got
 var hop_airborne := false # ...did all four wheels leave the ground at once?
 var crate_start := Vector3.ZERO # kick: where the crate was before the kick
+var driving_frames := 0 # frames with the throttle down and a wheel on the ground (in the air burns nothing)
 
 
 func _initialize() -> void:
@@ -167,6 +168,8 @@ func _physics_process(_delta: float) -> bool:
 			if fuel_out_at < 0.0 and v.fuel <= 0.0:
 				fuel_out_at = frame / 60.0
 			top_speed_seen = maxf(top_speed_seen, v.speed_kmh())
+			if frame > 60 and v.wheels.any(func(w): return w.grounded):
+				driving_frames += 1
 		"fly":
 			if frame > 30: Input.action_press("accelerate")
 		"jump":
@@ -216,7 +219,7 @@ func _physics_process(_delta: float) -> bool:
 			frame / 60.0, v.global_position.x, v.global_position.y, v.global_position.z,
 			v.speed_kmh(), up.y, pitch, roll, grounded, heading])
 		if scenario == "fuel":
-			print("        fuel=%.2f / %.0f" % [v.fuel, v.fuel_capacity])
+			print("        fuel=%.2f / %.0f  engine load %.2f" % [v.fuel, v.fuel_capacity, v.engine_load])
 		if crate:
 			print("        crate=(%6.1f %5.2f %6.1f) %.1f m ahead" % [crate.position.x, crate.position.y, crate.position.z, (crate.position - v.global_position).dot(-v.global_basis.z)])
 	if scenario == "jump" and frame >= JUMP_FRAMES:
@@ -320,6 +323,8 @@ func _check_expectations(v: Vehicle) -> void:
 			print("on land: air propeller sled moved %.1f m, water propeller sled %.1f m" % [sled_moved[0], sled_moved[1]])
 			check(sled_moved[0] >= 5.0, "air propeller pushes on land (%.1f m >= 5 m)" % sled_moved[0])
 			check(sled_moved[1] < 1.0, "water propeller does nothing on land (%.1f m < 1 m)" % sled_moved[1])
+			# Fuel follows power used: a propeller that can't push uses no power, so burns no fuel.
+			check(v.fuel == v.fuel_capacity, "water propeller on land burns no fuel (%.2f of %.0f left)" % [v.fuel, v.fuel_capacity])
 		"turn":
 			check(turned > 90.0, "turned left more than 90 deg (%.0f deg)" % turned)
 		"ramp":
@@ -331,7 +336,11 @@ func _check_expectations(v: Vehicle) -> void:
 			if v.has_tanks:
 				check(v.fuel > 0.0, "still has fuel after 9 s of full throttle (%.1f left)" % v.fuel)
 				var burned := fuel_start - v.fuel
-				check(absf(burned - 9.0 * v.fuel_use) < 0.5, "burned about %.1f fuel (%.1f)" % [9.0 * v.fuel_use, burned])
+				# Fuel follows power used: full throttle on the ground = full burn, but
+				# flying off the jump ramp (no wheels down) burns nothing.
+				var expected_burn := driving_frames / 60.0 * v.fuel_use
+				check(absf(burned - expected_burn) < 0.3, "burned about %.1f fuel, only while wheels were down (%.1f)" % [expected_burn, burned])
+				check(burned < 9.0 * v.fuel_use - 0.5, "burned less than 9 s worth, thanks to the air time (%.1f)" % burned)
 				check(speed > 30.0, "kept driving to the end (%.0f km/h > 30)" % speed)
 			else:
 				# Throttle goes down at t = 1 s, so the reserve should run dry at 1 + reserve / use.

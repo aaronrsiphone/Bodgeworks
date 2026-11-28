@@ -15,7 +15,9 @@ extends RigidBody3D
 ## Pushing at the part's position (not the middle) is what makes off-centre
 ## thrust turn you and heavy parts tip you.
 ##
-## Fuel: engines burn fuel while you hold the throttle (more throttle = more fuel).
+## Fuel: engines burn fuel for the power they actually deliver to wheels on the
+## ground and propellers that can push. Full throttle on the road = full burn;
+## wheels spinning in the air or a water propeller on dry land burn nothing.
 ## When the fuel runs out, wheels and propellers stop pushing. A new vehicle
 ## (respawn, mission restart, back to the garage) always starts with a full tank.
 
@@ -51,7 +53,8 @@ var engine_power := 0.0 # how much push they can keep up as you go faster (W = N
 var has_seat := false
 var fuel := 0.0 # fuel left
 var fuel_capacity := 0.0 # fuel when full
-var fuel_use := 0.0 # fuel burned per second at full throttle (all engines together)
+var fuel_use := 0.0 # fuel burned per second at full power (all engines together)
+var engine_load := 0.0 # how much of the engine power is being used right now (0..1)
 var has_tanks := false # false = only the reserve can under the seat
 ## Accessory buttons: button number (1-3) -> the parts wired to it.
 var buttons := {}
@@ -333,10 +336,7 @@ func _physics_process(delta: float) -> void:
 	var forward := -global_basis.z
 	var com_global := to_global(center_of_mass)
 	var speed := linear_velocity.dot(forward)
-	var powered := engine_power > 0.0 and has_seat and fuel > 0.0
-	if powered:
-		# Burn fuel in proportion to how hard you press the throttle.
-		fuel = maxf(fuel - fuel_use * absf(throttle) * delta, 0.0)
+	var powered := engine_power > 0.0 and has_seat and fuel > 0.0 # no fuel = no push
 
 	# Steering: less lock at high speed so you don't flip instantly.
 	var max_steer := deg_to_rad(32.0) / (1.0 + absf(speed) * 0.06)
@@ -367,6 +367,10 @@ func _physics_process(delta: float) -> void:
 		weight_total += t.grip
 	var push_per_weight := drive_total / weight_total if weight_total > 0.0 else 0.0
 
+	var delivered := 0.0 # push (N) that actually goes somewhere, added up below
+	for w in wheels:
+		if w.grounded:
+			delivered += absf(push_per_weight)
 	_apply_wheels(delta, up, com_global, push_per_weight)
 	_run_buttons(delta)
 
@@ -385,12 +389,28 @@ func _physics_process(delta: float) -> void:
 		t.root.basis = aim
 		var dir: Vector3 = global_basis * (aim * Vector3.FORWARD)
 		apply_force(dir * push, at - global_position)
+		delivered += absf(push)
 		if t.has("spinner"):
 			t.spinner.rotate_z(throttle * delta * 25.0 if powered else 0.0)
 
 	_apply_wings(com_global)
+	_burn_fuel(delta, delivered, speed, throttle)
+
 	_apply_water(com_global)
 	apply_central_force(-linear_velocity * linear_velocity.length() * AIR_DRAG)
+
+
+## Fuel burns in proportion to the power used: power = push x speed.
+## Below the "knee" speed (engine_power / engine_force) the engines are capped by
+## force, not power, but they're still working flat out, so we count them as full power.
+func _burn_fuel(delta: float, delivered: float, speed: float, throttle_now: float) -> void:
+	engine_load = 0.0
+	if engine_power <= 0.0 or fuel <= 0.0 or delivered <= 0.0:
+		return
+	var knee := engine_power / maxf(engine_force, 1.0)
+	var going_with := absf(speed) if signf(throttle_now) == signf(speed) else 0.0
+	engine_load = clampf(delivered * maxf(going_with, knee) / engine_power, 0.0, 1.0)
+	fuel = maxf(fuel - fuel_use * engine_load * delta, 0.0)
 
 
 ## Casts the wheel's suspension ray. Returns the hit (empty if the wheel is in the air).
@@ -556,7 +576,7 @@ static func fuel_for(defs: Array) -> Dictionary:
 	return {"capacity": capacity, "use": use, "tanks": tanks}
 
 
-## How many seconds of full throttle the fuel lasts (INF if the engines burn nothing).
+## How many seconds of full power the fuel lasts (INF if the engines burn nothing).
 static func fuel_seconds(capacity: float, use: float) -> float:
 	return INF if use <= 0.0 else capacity / use
 
